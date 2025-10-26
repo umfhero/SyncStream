@@ -1,4 +1,4 @@
-# SyncStream 🚀
+# SyncStream
 
 **Modern peer-to-peer file sharing with unlimited file sizes**
 
@@ -6,9 +6,9 @@ SyncStream is a complete redesign of Vortext-Tunnel-V3, offering a clean, modern
 
 ---
 
-## ✨ Key Features
+## Key Features
 
-### 🔄 **Seamless File Transfers**
+### **Seamless File Transfers**
 
 - **Unlimited file size** - Share files of any size
 - **Multiple simultaneous transfers** - Queue and track multiple files at once
@@ -17,7 +17,7 @@ SyncStream is a complete redesign of Vortext-Tunnel-V3, offering a clean, modern
 - **Queue management** - Visual checklist of queued, active, and completed transfers
 - **Offline queueing** - Files are automatically sent when connection is restored
 
-### 📁 **Smart File Handling**
+### **Smart File Handling**
 
 - **Drag-and-drop** - Primary method for quick file sharing
 - **File browser** - Alternative method with standard file picker
@@ -25,7 +25,7 @@ SyncStream is a complete redesign of Vortext-Tunnel-V3, offering a clean, modern
 - **Optional compression** - Enable compression for faster transfers (off by default)
 - **File history** - Complete history of sent and received files persists across sessions
 
-### 🎨 **Modern UI/UX**
+### **Modern UI/UX**
 
 - **Dual theme support** - Light and dark themes with quick toggle
 - **Responsive design** - Scales beautifully from 30% to 100% screen size
@@ -34,7 +34,7 @@ SyncStream is a complete redesign of Vortext-Tunnel-V3, offering a clean, modern
 - **Visual connection status** - Green/orange/red LED indicator
 - **Smart notifications** - System notifications for transfers and errors
 
-### 📊 **File Gallery**
+### **File Gallery**
 
 - **Grid layout with thumbnails** - Visual gallery of all shared files
 - **Responsive thumbnails** - Automatically size to window
@@ -43,7 +43,7 @@ SyncStream is a complete redesign of Vortext-Tunnel-V3, offering a clean, modern
 - **Smart filters** - Filter by sender, date, and file type (mp4, png, jpg, etc.)
 - **Quick actions** - Open, Delete, Re-send, Save As, Download
 
-### 🌐 **Reliable Networking**
+### **Reliable Networking**
 
 - **Built on Tailscale** - Secure VPN-based peer-to-peer connectivity
 - **Auto-reconnect** - Automatically reconnects with 2-3 minute timeout
@@ -51,7 +51,7 @@ SyncStream is a complete redesign of Vortext-Tunnel-V3, offering a clean, modern
 - **Connection monitoring** - Real-time connection status tracking
 - **Intelligent error detection** - Detects and reports Tailscale connection issues
 
-### 📈 **Network Statistics**
+### **Network Statistics**
 
 - **Total data transferred** - Track overall data usage
 - **Per-user statistics** - See data transferred per peer
@@ -60,7 +60,7 @@ SyncStream is a complete redesign of Vortext-Tunnel-V3, offering a clean, modern
 
 ---
 
-## 🏗️ Architecture
+## Architecture
 
 ### Network Infrastructure
 
@@ -85,7 +85,7 @@ SyncStream is a complete redesign of Vortext-Tunnel-V3, offering a clean, modern
 
 ---
 
-## 🛠️ Technical Stack
+## Technical Stack
 
 - **Python 3.8+**
 - **CustomTkinter** - Modern, customizable UI framework
@@ -97,7 +97,7 @@ SyncStream is a complete redesign of Vortext-Tunnel-V3, offering a clean, modern
 
 ---
 
-## 📦 Installation
+## Installation
 
 ### Prerequisites
 
@@ -126,7 +126,7 @@ python src/syncstream.py
 
 ---
 
-## ⚙️ Configuration
+## Configuration
 
 ### Setting Up Profiles
 
@@ -163,7 +163,7 @@ python src/syncstream.py
 
 ---
 
-## 🎯 Usage
+## Usage
 
 ### Sending Files
 
@@ -203,48 +203,9 @@ python src/syncstream.py
 
 ---
 
-## 🚫 What's NOT Included
-
-To keep SyncStream focused and efficient, the following V3 features were removed:
-
-- ❌ Drawing/canvas functionality
-- ❌ Text messaging/chat
-- ❌ Real-time mouse position sharing
-
----
-
----
-
-## 🎨 Design System
-
 ### Theme Philosophy
 
 SyncStream features a carefully crafted dual-theme system that prioritizes clarity, usability, and modern aesthetics.
-
-#### Light Theme
-
-- **Background:** Clean white/off-white (#FAFAFA)
-- **Text:** Dark gray (#2C3E50) for maximum readability
-- **Accent:** Vibrant blue (#3498DB) for interactive elements
-- **Shadows:** Subtle 2-4px soft shadows for gentle depth
-- **Feel:** Professional, clean, approachable
-
-#### Dark Theme
-
-- **Background:** Deep charcoal (#1E1E1E)
-- **Text:** Light gray (#ECEFF1) for clear contrast
-- **Accent:** Luminous blue (#3498DB) against dark background
-- **Shadows:** Barely-visible embossed effects
-- **Feel:** Modern, focused, easy on eyes
-
-#### Shared Design Principles
-
-- Minimal depth with 2-4px shadows
-- Smooth transitions for all interactive elements
-- Generous spacing for breathability
-- Restrained use of neumorphic effects
-- Bold sans-serif typography
-- Consistent accent color across themes
 
 ---
 
@@ -277,19 +238,12 @@ TBC (not sure yet)
 ## 🙏 Acknowledgments
 
 - Built on top of concepts from Vortext-Tunnel-V3
-- Uses the excellent [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) framework
-- Powered by [Tailscale](https://tailscale.com/) for secure networking
+- Useing [CustomTkinter](https://github.com/TomSchimansky/CustomTkinter) framework
+- Powered by [Tailscale](https://tailscale.com/) for networking
 
 ---
-
-## 📞 Support
-
-For issues, questions, or suggestions:
-
-- Open an issue on GitHub
-- Check the [documentation](docs/)
-- Review the troubleshooting guide
-
----
+1. START.bat          ← Checks everything and launches!
+2. Or setup.bat       ← If you need to install first
+3. Then run.bat       ← To launch directly
 
 **Made with ❤️ for seamless file sharing**
