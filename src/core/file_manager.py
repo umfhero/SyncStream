@@ -140,17 +140,21 @@ class FileManager:
 
             # Generate thumbnail
             with Image.open(path) as img:
-                # Convert RGBA to RGB if needed
+                # Preserve transparency for RGBA/LA/P images
                 if img.mode in ('RGBA', 'LA', 'P'):
-                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    # Convert P mode to RGBA to preserve transparency
                     if img.mode == 'P':
                         img = img.convert('RGBA')
-                    background.paste(img, mask=img.split(
-                    )[-1] if img.mode in ('RGBA', 'LA') else None)
-                    img = background
-
-                img.thumbnail(size, Image.Resampling.LANCZOS)
-                img.save(thumb_path, quality=85)
+                    # Keep RGBA format to preserve transparency
+                    img.thumbnail(size, Image.Resampling.LANCZOS)
+                    # Save as PNG to preserve alpha channel
+                    img.save(thumb_path, 'PNG')
+                else:
+                    # For non-transparent images, convert to RGB
+                    if img.mode != 'RGB':
+                        img = img.convert('RGB')
+                    img.thumbnail(size, Image.Resampling.LANCZOS)
+                    img.save(thumb_path, quality=85)
 
             return thumb_path
 

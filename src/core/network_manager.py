@@ -10,6 +10,7 @@ import time
 from enum import Enum
 from typing import Callable, Optional, Dict, Any
 from datetime import datetime, timedelta
+from .transfer_protocol import TransferProtocol
 
 
 class ConnectionState(Enum):
@@ -48,6 +49,9 @@ class NetworkManager:
         self.reconnect_attempts = 0
         self.max_reconnect_attempts = 3
         self.last_disconnect_time: Optional[datetime] = None
+
+        # Transfer protocol
+        self.transfer_protocol = TransferProtocol()
 
         # Threading
         self._running = False
