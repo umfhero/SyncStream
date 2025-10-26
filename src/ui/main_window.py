@@ -277,10 +277,14 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         bottom_bar = ctk.CTkFrame(main_frame)
         bottom_bar.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
 
-        bottom_bar.grid_columnconfigure(0, weight=0)
-        bottom_bar.grid_columnconfigure(1, weight=1)
-        bottom_bar.grid_columnconfigure(2, weight=0)
-        bottom_bar.grid_columnconfigure(3, weight=0)
+        bottom_bar.grid_columnconfigure(0, weight=0)  # Gallery toggle button
+        bottom_bar.grid_columnconfigure(1, weight=0)  # Search box
+        bottom_bar.grid_columnconfigure(2, weight=0)  # Filter button
+        bottom_bar.grid_columnconfigure(3, weight=1)  # Spacer
+        bottom_bar.grid_columnconfigure(4, weight=0)  # Theme button
+
+        # Store bottom_bar reference for later use
+        self.bottom_bar = bottom_bar
 
         # Gallery toggle button
         self.gallery_btn = ctk.CTkButton(
@@ -292,7 +296,19 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         )
         self.gallery_btn.grid(row=0, column=0, padx=5, pady=5)
 
-        # Filter button
+        # Search box (hidden by default, shown when gallery is visible)
+        self.search_var = ctk.StringVar()
+        self.search_var.trace("w", lambda *args: self._filter_gallery())
+        self.search_entry = ctk.CTkEntry(
+            bottom_bar,
+            placeholder_text="Search files...",
+            width=200,
+            textvariable=self.search_var,
+            font=("Arial", 11)
+        )
+        # Don't grid it yet - will be shown when gallery is visible
+
+        # Filter button (hidden by default, shown when gallery is visible)
         self.filter_btn = ctk.CTkButton(
             bottom_bar,
             text="Filter: All",
@@ -300,7 +316,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             command=self._cycle_filter,
             font=("Arial", 11, "bold")
         )
-        self.filter_btn.grid(row=0, column=2, padx=5, pady=5)
+        # Don't grid it yet - will be shown when gallery is visible
 
         # Theme toggle button
         try:
@@ -349,7 +365,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 hover_color=("gray85", "gray25")
             )
 
-        self.theme_btn.grid(row=0, column=3, padx=5, pady=5)
+        self.theme_btn.grid(row=0, column=4, padx=5, pady=5)
 
         # Load file gallery
         self._load_file_gallery()
@@ -449,6 +465,10 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             self.browse_btn.grid()
             self.gallery_btn.configure(text="Show Gallery")
             self.gallery_visible = False
+
+            # Hide search and filter
+            self.search_entry.grid_forget()
+            self.filter_btn.grid_forget()
         else:
             # Show gallery
             self.drop_icon.grid_forget()
@@ -459,12 +479,24 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             self.gallery_btn.configure(text="Hide Gallery")
             self.gallery_visible = True
 
+            # Show search and filter
+            self.search_entry.grid(row=0, column=1, padx=5, pady=5, sticky="w")
+            self.filter_btn.grid(row=0, column=2, padx=5, pady=5)
+
     def _cycle_filter(self):
         """Cycle through file filters"""
         # Placeholder for filter functionality
         pass
 
-    def _load_file_gallery(self):
+    def _filter_gallery(self):
+        """Filter gallery based on search text"""
+        if not self.gallery_visible:
+            return
+
+        search_text = self.search_var.get().lower()
+        self._load_file_gallery(search_filter=search_text)
+
+    def _load_file_gallery(self, search_filter=""):
         """Load files into gallery"""
         # Clear existing items
         for widget in self.gallery_frame.winfo_children():
@@ -473,10 +505,14 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         # Get files from shared_files list
         files = self.shared_files
 
+        # Apply search filter if provided
+        if search_filter:
+            files = [f for f in files if search_filter in Path(f).name.lower()]
+
         if not files:
             no_files_label = ctk.CTkLabel(
                 self.gallery_frame,
-                text="No files shared yet",
+                text="No files found" if search_filter else "No files shared yet",
                 font=("Arial", 14),
                 text_color="gray"
             )
