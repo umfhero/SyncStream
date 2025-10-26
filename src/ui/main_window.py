@@ -7,6 +7,7 @@ from pathlib import Path
 from PIL import Image
 import json
 import os
+import sys
 from typing import Optional
 
 try:
@@ -32,6 +33,18 @@ except ImportError:
     print("⚠️  pystray not available. System tray will be disabled.")
 
 
+def get_resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    try:
+        # PyInstaller creates a temp folder and stores path in _MEIPASS
+        base_path = Path(sys._MEIPASS)
+    except Exception:
+        # Running in development
+        base_path = Path(__file__).parent.parent.parent
+
+    return base_path / relative_path
+
+
 class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
     """Main application window"""
 
@@ -42,6 +55,9 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         self.theme_manager = theme_manager
         self.network_manager = network_manager
         self.file_manager = file_manager
+
+        # Set assets path for use throughout the app
+        self.assets_path = get_resource_path("Assets")
 
         # Clear old thumbnails to regenerate with transparency
         self._clear_thumbnail_cache()
@@ -67,10 +83,11 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         # Set window icon based on theme (BLACK icon for dark mode, WHITE icon for light mode)
         try:
             icon_name = "blackp2p.ico" if self.theme_manager.current_theme_name == "dark" else "whitep2p.ico"
-            icon_path = Path(__file__).parent.parent.parent / \
-                "Assets" / icon_name
+            icon_path = self.assets_path / icon_name
             if icon_path.exists():
                 self.iconbitmap(str(icon_path))
+            else:
+                print(f"⚠️  Icon not found: {icon_path}")
         except Exception as e:
             print(f"⚠️  Failed to load icon: {e}")
 
@@ -143,8 +160,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
     def _load_profiles(self):
         """Load profile information from config"""
         try:
-            config_path = Path(__file__).parent.parent.parent / \
-                "config" / "settings.json"
+            config_path = get_resource_path("config") / "settings.json"
             if config_path.exists():
                 with open(config_path, 'r') as f:
                     config = json.load(f)

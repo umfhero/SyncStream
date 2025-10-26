@@ -1,0 +1,3 @@
+@echo off
+echo Starting SyncStream V2.0.0...
+SyncStream.exe

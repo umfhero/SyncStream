@@ -1,0 +1,31 @@
+
+# SyncStream V2.0.0 - Quick Start
+
+## Installation
+1. Extract this folder to your desired location
+2. Run SyncStream.exe
+
+## First Time Setup
+1. Configure your profile in config/settings.json
+2. Add peer profiles with Tailscale IPs
+3. Start sharing files!
+
+## Usage
+- **Drag & Drop**: Drop files anywhere on the window
+- **Gallery**: Click files to send to connected peer
+- **Theme**: Click 🌓 button to toggle light/dark mode
+- **Connect**: Select peer profile and click Connect
+
+## Features
+✨ Unlimited file sizes
+🚀 Real-time progress tracking
+🎨 Modern dual-theme UI
+🔒 Secure Tailscale VPN connection
+💾 Persistent file history
+🖼️ Image thumbnails
+🔍 Search and filter files
+
+## Support
+For issues or questions, check README.md
+
+Enjoy sharing files! 🎉
