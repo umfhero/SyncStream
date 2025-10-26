@@ -31,18 +31,19 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         self.title("SyncStream")
         self.geometry("900x700")
 
-        # Set window icon
+        # Set theme to green and appearance mode
+        ctk.set_default_color_theme("green")
+        ctk.set_appearance_mode(self.theme_manager.get_ctk_theme_mode())
+
+        # Set window icon based on theme
         try:
+            icon_name = "whitep2p.ico" if self.theme_manager.current_theme_name == "dark" else "blackp2p.ico"
             icon_path = Path(__file__).parent.parent.parent / \
-                "Assets" / "blackp2p.ico"
+                "Assets" / icon_name
             if icon_path.exists():
                 self.iconbitmap(str(icon_path))
         except Exception as e:
             print(f"⚠️  Failed to load icon: {e}")
-
-        # Set theme to green and appearance mode
-        ctk.set_default_color_theme("green")
-        ctk.set_appearance_mode(self.theme_manager.get_ctk_theme_mode())
 
         # Load profiles
         self._load_profiles()
@@ -585,6 +586,16 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         # Toggle theme
         self.theme_manager.toggle_theme()
         ctk.set_appearance_mode(self.theme_manager.get_ctk_theme_mode())
+
+        # Update window icon based on theme
+        try:
+            icon_name = "whitep2p.ico" if self.theme_manager.current_theme_name == "dark" else "blackp2p.ico"
+            icon_path = Path(__file__).parent.parent.parent / \
+                "Assets" / icon_name
+            if icon_path.exists():
+                self.iconbitmap(str(icon_path))
+        except Exception as e:
+            print(f"⚠️  Failed to update window icon: {e}")
 
         # Update theme button icon
         try:
