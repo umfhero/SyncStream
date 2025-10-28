@@ -66,7 +66,8 @@ class ConfigManager:
         self.history_file = self.app_data_dir / "transfer_history.json"
 
         # Initialize data structures
-        self.profiles: List[Profile] = []
+        self.my_profile: Optional[Profile] = None  # User's own profile
+        self.profiles: List[Profile] = []  # Peer profiles to connect to
         self.settings = AppSettings()
         self.last_profile: Optional[str] = None
         self.last_peer: Optional[str] = None
@@ -87,17 +88,34 @@ class ConfigManager:
             with open(self.profiles_file, 'r') as f:
                 data = json.load(f)
 
-            # Load profiles
+            # Load my profile (user's own device)
+            my_profile_data = data.get("my_profile")
+            if my_profile_data:
+                self.my_profile = Profile(**my_profile_data)
+
+            # Load peer profiles (other devices to connect to)
             self.profiles = [
                 Profile(**profile_data)
-                for profile_data in data.get("profiles", [])
+                for profile_data in data.get("peer_profiles", [])
             ]
+
+            # Backward compatibility: if old format with "profiles" array exists
+            if not my_profile_data and "profiles" in data:
+                old_profiles = data.get("profiles", [])
+                if old_profiles:
+                    # First profile becomes "my_profile"
+                    self.my_profile = Profile(**old_profiles[0])
+                    # Rest become peer profiles
+                    self.profiles = [Profile(**p) for p in old_profiles[1:]]
 
             # Load last connection state
             self.last_profile = data.get("last_profile")
             self.last_peer = data.get("last_peer")
 
-            print(f"✅ Loaded {len(self.profiles)} profiles")
+            peer_count = len(self.profiles)
+            has_my_profile = "Yes" if self.my_profile else "No"
+            print(
+                f"✅ Loaded my profile: {has_my_profile}, {peer_count} peer profile(s)")
 
         except Exception as e:
             print(f"❌ Error loading profiles: {e}")
@@ -162,15 +180,74 @@ class ConfigManager:
             print(f"❌ Error saving last connection: {e}")
 
     def get_profile_by_name(self, name: str) -> Optional[Profile]:
-        """Get a profile by name"""
+        """Get a peer profile by name"""
         for profile in self.profiles:
             if profile.name == name:
                 return profile
         return None
 
+    def get_profiles(self) -> List[Profile]:
+        """Get list of peer profiles (for connecting to others)"""
+        return self.profiles
+
+    def get_my_profile(self) -> Optional[Profile]:
+        """Get user's own profile"""
+        return self.my_profile
+
     def get_profile_names(self) -> List[str]:
-        """Get list of all profile names"""
+        """Get list of peer profile names"""
         return [p.name for p in self.profiles]
+
+    def set_my_profile(self, name: str, ip: str, port: int = 12345, description: str = "") -> None:
+        """
+        Set the user's own profile (created during onboarding)
+
+        Args:
+            name: Profile name
+            ip: Tailscale IP address
+            port: Port number (default: 12345)
+            description: Optional description
+        """
+        self.my_profile = Profile(
+            name=name, ip=ip, port=port, description=description)
+
+    def add_profile(self, name: str, ip: str, port: int = 12345, description: str = "") -> None:
+        """
+        Add a new peer profile (other devices to connect to)
+
+        Args:
+            name: Profile name
+            ip: Tailscale IP address
+            port: Port number (default: 12345)
+            description: Optional description
+        """
+        # Check if profile with same name already exists
+        if any(p.name == name for p in self.profiles):
+            raise ValueError(f"Profile '{name}' already exists")
+
+        new_profile = Profile(name=name, ip=ip, port=port,
+                              description=description)
+        self.profiles.append(new_profile)
+
+    def save_profiles(self) -> None:
+        """Save all profiles to profiles.json"""
+        try:
+            # Save in new format with my_profile and peer_profiles
+            data = {
+                "my_profile": asdict(self.my_profile) if self.my_profile else None,
+                "peer_profiles": [asdict(p) for p in self.profiles],
+                "last_profile": self.last_profile,
+                "last_peer": self.last_peer
+            }
+
+            with open(self.profiles_file, 'w') as f:
+                json.dump(data, f, indent=2)
+
+            peer_count = len(self.profiles)
+            print(f"✅ Saved my profile and {peer_count} peer profile(s)")
+        except Exception as e:
+            print(f"❌ Error saving profiles: {e}")
+            raise
 
     def get_download_location(self) -> Path:
         """Get the download location (custom or default)"""

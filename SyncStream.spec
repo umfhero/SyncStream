@@ -3,7 +3,7 @@ from PyInstaller.utils.hooks import collect_all
 
 datas = [('Assets', 'Assets'), ('config', 'config')]
 binaries = []
-hiddenimports = ['ui', 'ui.main_window', 'ui.theme_manager', 'core', 'core.network_manager', 'core.file_manager', 'core.transfer_protocol', 'PIL._tkinter_finder']
+hiddenimports = ['ui', 'ui.main_window', 'ui.theme_manager', 'core', 'core.network_manager', 'core.file_manager', 'core.transfer_protocol', 'utils.version_manager', 'PIL._tkinter_finder', 'requests', 'urllib3', 'certifi', 'charset_normalizer', 'idna']
 tmp_ret = collect_all('customtkinter')
 datas += tmp_ret[0]; binaries += tmp_ret[1]; hiddenimports += tmp_ret[2]
 tmp_ret = collect_all('tkinterdnd2')

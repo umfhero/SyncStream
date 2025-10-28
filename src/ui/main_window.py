@@ -60,7 +60,11 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         self.theme_manager = theme_manager
         self.network_manager = network_manager
         self.file_manager = file_manager
-        
+
+        # Initialize config manager
+        from core.config_manager import ConfigManager
+        self.config_manager = ConfigManager()
+
         # Initialize version manager
         self.version_manager = VersionManager()
 
@@ -72,7 +76,19 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
 
         # Configure window
         self.title("SyncStream")
-        self.geometry("900x700")
+
+        # Track onboarding state
+        self.showing_onboarding = False
+        self.main_ui_built = False
+
+        # Check if we need to show onboarding
+        self._check_if_onboarding_needed()
+
+        # Set window size based on whether we're showing onboarding
+        if self.showing_onboarding:
+            self.geometry("900x900")  # Taller for onboarding
+        else:
+            self.geometry("900x700")  # Normal size
 
         # Set theme to green and appearance mode
         ctk.set_default_color_theme("green")
@@ -149,6 +165,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         self.gallery_visible = False
         self.statistics_visible = False
         self.settings_visible = False
+        self.profile_manager_visible = False
 
         # Save files on close
         self.protocol("WM_DELETE_WINDOW", self._on_window_close)
@@ -178,15 +195,21 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         self.compact_threshold_width = 400  # Switch to compact mode below this width
         self.manual_size_override = False  # Track if user manually toggled size
 
-        # Build UI
-        self._build_ui()
+        # Check if we need to show onboarding (already done earlier, build appropriate UI)
+        # Build appropriate UI (onboarding or main app)
+        if self.showing_onboarding:
+            self._build_onboarding_ui()
+        else:
+            self._build_ui()
+            self.main_ui_built = True
 
-        # Setup drag and drop if available
-        if DRAG_DROP_AVAILABLE:
+        # Setup drag and drop if available and not in onboarding
+        if DRAG_DROP_AVAILABLE and not self.showing_onboarding:
             self._setup_drag_drop()
 
         # Bind window resize event to check for compact mode
-        self.bind("<Configure>", self._on_window_resize)
+        if not self.showing_onboarding:
+            self.bind("<Configure>", self._on_window_resize)
 
     def _load_profiles(self):
         """Load profile information from config"""
@@ -218,6 +241,348 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 print("🗑️  Cleared thumbnail cache")
         except Exception as e:
             print(f"⚠️  Failed to clear thumbnail cache: {e}")
+
+    def _check_if_onboarding_needed(self):
+        """Check if onboarding should be shown for first-time users"""
+        try:
+            # Check if user has set their own profile
+            from core.config_manager import ConfigManager
+            temp_config = ConfigManager()
+            my_profile = temp_config.get_my_profile()
+
+            if not my_profile:
+                # No user profile exists, show onboarding
+                self.showing_onboarding = True
+            else:
+                self.showing_onboarding = False
+        except Exception as e:
+            print(f"⚠️  Failed to check onboarding: {e}")
+            self.showing_onboarding = False
+
+    def _build_onboarding_ui(self):
+        """Build the onboarding page UI"""
+        # Configure window grid
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=0)  # Theme toggle button row
+        self.grid_rowconfigure(1, weight=1)  # Scrollable content
+
+        # Get theme colors
+        frame_colors = self.theme_manager.get_frame_colors()
+        text_color = self.theme_manager.current_theme.text_primary
+
+        # Top bar with just theme toggle
+        top_bar = ctk.CTkFrame(self, fg_color="transparent", corner_radius=0)
+        top_bar.grid(row=0, column=0, sticky="ew", padx=20, pady=(10, 0))
+
+        # Theme toggle button (top right)
+        theme_btn = ctk.CTkButton(
+            top_bar,
+            text="🌙" if self.theme_manager.current_theme_name == "light" else "☀️",
+            width=40,
+            height=40,
+            font=("Segoe UI Emoji", 18),
+            command=self._toggle_theme_onboarding,
+            fg_color=frame_colors.get("fg_color"),
+            hover_color=frame_colors.get("hover_color", "#3a3a3a")
+        )
+        theme_btn.pack(side="right")
+        self.onboarding_theme_btn = theme_btn
+
+        # Create scrollable frame for content
+        scrollable = ctk.CTkScrollableFrame(
+            self,
+            fg_color="transparent",
+            corner_radius=0
+        )
+        scrollable.grid(row=1, column=0, sticky="nsew", padx=20, pady=20)
+        scrollable.grid_columnconfigure(0, weight=1)
+
+        # Welcome header
+        welcome_label = ctk.CTkLabel(
+            scrollable,
+            text="Welcome to SyncStream",
+            font=("Segoe UI", 36, "bold"),
+            text_color=text_color
+        )
+        welcome_label.grid(row=0, column=0, pady=(20, 10))
+
+        # Subtitle
+        subtitle = ctk.CTkLabel(
+            scrollable,
+            text="Let's get you set up with your first profile",
+            font=("Segoe UI", 16),
+            text_color=text_color
+        )
+        subtitle.grid(row=1, column=0, pady=(0, 30))
+
+        # Tailscale setup section
+        tailscale_frame = ctk.CTkFrame(
+            scrollable, fg_color=frame_colors.get("fg_color"), corner_radius=12)
+        tailscale_frame.grid(row=2, column=0, sticky="ew",
+                             pady=(0, 30), padx=40)
+        tailscale_frame.grid_columnconfigure(0, weight=1)
+
+        tailscale_title = ctk.CTkLabel(
+            tailscale_frame,
+            text="Step 1: Install Tailscale",
+            font=("Segoe UI", 20, "bold"),
+            text_color=text_color
+        )
+        tailscale_title.grid(row=0, column=0, pady=(
+            20, 10), padx=20, sticky="w")
+
+        tailscale_desc = ctk.CTkLabel(
+            tailscale_frame,
+            text="SyncStream uses Tailscale to securely connect your devices.\nIf you don't have Tailscale installed yet, click the button below:",
+            font=("Segoe UI", 14),
+            text_color=text_color,
+            justify="left"
+        )
+        tailscale_desc.grid(row=1, column=0, pady=(0, 15), padx=20, sticky="w")
+
+        tailscale_btn = ctk.CTkButton(
+            tailscale_frame,
+            text="Open Tailscale Setup Guide",
+            font=("Segoe UI", 14, "bold"),
+            height=40,
+            command=lambda: webbrowser.open(
+                "https://tailscale.com/kb/1017/install"),
+            fg_color="#0ea5e9",
+            hover_color="#0284c7"
+        )
+        tailscale_btn.grid(row=2, column=0, pady=(0, 20), padx=20)
+
+        # Profile creation section
+        profile_frame = ctk.CTkFrame(
+            scrollable, fg_color=frame_colors.get("fg_color"), corner_radius=12)
+        profile_frame.grid(row=3, column=0, sticky="ew", pady=(0, 30), padx=40)
+        profile_frame.grid_columnconfigure(0, weight=1)
+
+        profile_title = ctk.CTkLabel(
+            profile_frame,
+            text="Step 2: Create Your Profile",
+            font=("Segoe UI", 20, "bold"),
+            text_color=text_color
+        )
+        profile_title.grid(row=0, column=0, pady=(20, 10), padx=20, sticky="w")
+
+        profile_desc = ctk.CTkLabel(
+            profile_frame,
+            text="Enter your device name and Tailscale IP address.\nYou can find your Tailscale IP in the Tailscale app.",
+            font=("Segoe UI", 14),
+            text_color=text_color,
+            justify="left"
+        )
+        profile_desc.grid(row=1, column=0, pady=(0, 20), padx=20, sticky="w")
+
+        # Profile name input
+        name_label = ctk.CTkLabel(
+            profile_frame,
+            text="Profile Name (e.g., 'My Laptop'):",
+            font=("Segoe UI", 14),
+            text_color=text_color
+        )
+        name_label.grid(row=2, column=0, pady=(0, 5), padx=20, sticky="w")
+
+        self.onboarding_name_entry = ctk.CTkEntry(
+            profile_frame,
+            font=("Segoe UI", 14),
+            height=40,
+            placeholder_text="Enter your profile name"
+        )
+        self.onboarding_name_entry.grid(
+            row=3, column=0, pady=(0, 20), padx=20, sticky="ew")
+
+        # IP address input
+        ip_label = ctk.CTkLabel(
+            profile_frame,
+            text="Your Tailscale IP Address (e.g., '100.64.0.1'):",
+            font=("Segoe UI", 14),
+            text_color=text_color
+        )
+        ip_label.grid(row=4, column=0, pady=(0, 5), padx=20, sticky="w")
+
+        self.onboarding_ip_entry = ctk.CTkEntry(
+            profile_frame,
+            font=("Segoe UI", 14),
+            height=40,
+            placeholder_text="Enter your Tailscale IP"
+        )
+        self.onboarding_ip_entry.grid(
+            row=5, column=0, pady=(0, 20), padx=20, sticky="ew")
+
+        # Error label (hidden by default)
+        self.onboarding_error_label = ctk.CTkLabel(
+            profile_frame,
+            text="",
+            font=("Segoe UI", 12),
+            text_color="#ef4444"
+        )
+        self.onboarding_error_label.grid(
+            row=6, column=0, pady=(0, 10), padx=20)
+        self.onboarding_error_label.grid_remove()
+
+        # Create profile button
+        create_btn = ctk.CTkButton(
+            profile_frame,
+            text="Create Profile & Start Using SyncStream",
+            font=("Segoe UI", 16, "bold"),
+            height=50,
+            command=self._create_profile_from_onboarding,
+            fg_color="#22c55e",
+            hover_color="#16a34a"
+        )
+        create_btn.grid(row=7, column=0, pady=(0, 20), padx=20, sticky="ew")
+
+    def _toggle_theme_onboarding(self):
+        """Toggle theme while in onboarding"""
+        self.theme_manager.toggle_theme()
+        # Update theme button emoji
+        self.onboarding_theme_btn.configure(
+            text="🌙" if self.theme_manager.current_theme_name == "light" else "☀️"
+        )
+        # Rebuild the entire onboarding UI to apply new theme
+        for widget in self.winfo_children():
+            widget.destroy()
+        self._build_onboarding_ui()
+
+    def _create_profile_from_onboarding(self):
+        """Create profile from onboarding form"""
+        name = self.onboarding_name_entry.get().strip()
+        address = self.onboarding_ip_entry.get().strip()
+
+        # Validate inputs
+        if not name:
+            self.onboarding_error_label.configure(
+                text="Please enter a profile name")
+            self.onboarding_error_label.grid()
+            return
+
+        if not address:
+            self.onboarding_error_label.configure(
+                text="Please enter your Tailscale IP address")
+            self.onboarding_error_label.grid()
+            return
+
+        # Basic IP validation
+        if not self._validate_ip(address):
+            self.onboarding_error_label.configure(
+                text="Please enter a valid IP address (e.g., 100.64.0.1)")
+            self.onboarding_error_label.grid()
+            return
+
+        # Create the profile
+        try:
+            # Set as user's own profile (onboarding)
+            self.config_manager.set_my_profile(name, address)
+            self.config_manager.save_profiles()
+
+            print(f"✅ My profile created: {name} ({address})")
+
+            # Switch to main UI
+            self._switch_to_main_ui()
+        except Exception as e:
+            self.onboarding_error_label.configure(
+                text=f"Failed to create profile: {str(e)}")
+            self.onboarding_error_label.grid()
+
+    def _switch_to_main_ui(self):
+        """Switch from onboarding to main UI"""
+        # Clear all widgets
+        for widget in self.winfo_children():
+            widget.destroy()
+
+        # Reset state
+        self.showing_onboarding = False
+
+        # Resize window back to normal height
+        self.geometry("900x700")
+
+        # Force window update to apply geometry change
+        self.update_idletasks()
+
+        # Reconfigure window grid for main UI
+        self.grid_columnconfigure(0, weight=1)
+        self.grid_rowconfigure(0, weight=1)
+
+        # Reload config to get new profiles
+        from core.config_manager import ConfigManager
+        self.config_manager = ConfigManager()
+
+        # Build main UI
+        self._build_ui()
+        self.main_ui_built = True
+
+        # Setup drag and drop
+        if DRAG_DROP_AVAILABLE:
+            self._setup_drag_drop()
+
+        # Bind window resize event
+        self.bind("<Configure>", self._on_window_resize)
+
+        # Refresh profile dropdowns
+        self._refresh_profiles()
+
+        # Force a final update to ensure proper layout
+        self.update_idletasks()
+
+    def _validate_ip(self, ip: str) -> bool:
+        """Validate IP address format"""
+        try:
+            parts = ip.split('.')
+            if len(parts) != 4:
+                return False
+            for part in parts:
+                num = int(part)
+                if num < 0 or num > 255:
+                    return False
+            return True
+        except:
+            return False
+
+    def _open_url(self, url: str):
+        """Open URL in default browser"""
+        import webbrowser
+        webbrowser.open(url)
+
+    def _check_onboarding(self):
+        """Deprecated - onboarding is now checked at startup"""
+        pass
+
+    def _show_onboarding(self, config_manager):
+        """Deprecated - onboarding is now a full page view"""
+        pass
+
+    def _refresh_profiles(self):
+        """Refresh the profile dropdowns with latest data"""
+        try:
+            from core.config_manager import ConfigManager
+            config_manager = ConfigManager()
+            my_profile = config_manager.get_my_profile()
+            peer_profiles = config_manager.get_profiles()
+
+            if hasattr(self, 'my_profile_selector') and hasattr(self, 'peer_profile_selector'):
+                # Update My Profile dropdown (only shows user's own profile)
+                if my_profile:
+                    self.my_profile_selector.configure(
+                        values=[my_profile.name])
+                    self.my_profile_selector.set(my_profile.name)
+                    self.my_profile_var.set(my_profile.name)
+                else:
+                    self.my_profile_selector.configure(values=["No Profile"])
+                    self.my_profile_selector.set("No Profile")
+
+                # Update Connect to dropdown (shows peer profiles)
+                if peer_profiles and len(peer_profiles) > 0:
+                    peer_names = [p.name for p in peer_profiles]
+                    self.peer_profile_selector.configure(values=peer_names)
+                    self.peer_profile_selector.set(peer_names[0])
+                    self.peer_profile_var.set(peer_names[0])
+                else:
+                    self.peer_profile_selector.configure(values=["No Peers"])
+                    self.peer_profile_selector.set("No Peers")
+        except Exception as e:
+            print(f"⚠️  Failed to refresh profiles: {e}")
 
     def _load_shared_files(self):
         """Load shared files from persistent storage"""
@@ -336,8 +701,9 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         inner_top.grid_columnconfigure(2, weight=0)  # Pipe
         inner_top.grid_columnconfigure(3, weight=0)  # Connect to label
         inner_top.grid_columnconfigure(4, weight=1)  # Peer selector - expands
-        inner_top.grid_columnconfigure(5, weight=0)  # Stats button
-        inner_top.grid_columnconfigure(6, weight=0)  # Settings button
+        inner_top.grid_columnconfigure(5, weight=0)  # Add Profile button
+        inner_top.grid_columnconfigure(6, weight=0)  # Stats button
+        inner_top.grid_columnconfigure(7, weight=0)  # Settings button
 
         # My Profile label
         my_profile_label = ctk.CTkLabel(
@@ -347,15 +713,15 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         )
         my_profile_label.grid(row=0, column=0, padx=(0, 5), sticky="w")
 
-        # My Profile selector
-        profile_names = list(self.profiles.keys())
+        # My Profile selector (shows user's own profile)
+        my_profile = self.config_manager.get_my_profile()
+        my_profile_name = my_profile.name if my_profile else "No Profile"
 
-        self.my_profile_var = ctk.StringVar(
-            value=profile_names[0] if profile_names else "")
+        self.my_profile_var = ctk.StringVar(value=my_profile_name)
         self.my_profile_selector = ctk.CTkOptionMenu(
             inner_top,
             variable=self.my_profile_var,
-            values=profile_names if profile_names else ["No profiles"],
+            values=[my_profile_name],
             width=10,  # Will be updated dynamically
             font=self.btn_font,
             dynamic_resizing=True  # Enable dynamic resizing
@@ -379,13 +745,17 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         )
         connect_label.grid(row=0, column=3, padx=(0, 5), sticky="w")
 
-        # Peer Profile selector
-        self.peer_profile_var = ctk.StringVar(value=profile_names[1] if len(
-            profile_names) > 1 else (profile_names[0] if profile_names else ""))
+        # Peer Profile selector (shows peer profiles to connect to)
+        peer_profiles = self.config_manager.get_profiles()
+        peer_names = [p.name for p in peer_profiles] if peer_profiles else [
+            "No Peers"]
+        peer_default = peer_names[0] if peer_names else "No Peers"
+
+        self.peer_profile_var = ctk.StringVar(value=peer_default)
         self.peer_profile_selector = ctk.CTkOptionMenu(
             inner_top,
             variable=self.peer_profile_var,
-            values=profile_names if profile_names else ["No profiles"],
+            values=peer_names,
             width=10,  # Will be updated dynamically
             font=self.btn_font,
             dynamic_resizing=True  # Enable dynamic resizing
@@ -393,9 +763,58 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         self.peer_profile_selector.grid(
             row=0, column=4, padx=(0, 10), sticky="w")
 
+        # Add Profile button with icon
+        try:
+            addprofile_icon_path = Path(
+                __file__).parent.parent.parent / "Assets" / "addprofile.png"
+            if addprofile_icon_path.exists():
+                addprofile_icon = ctk.CTkImage(
+                    light_image=Image.open(addprofile_icon_path),
+                    dark_image=Image.open(addprofile_icon_path),
+                    size=(24, 24)
+                )
+                self.add_profile_btn = ctk.CTkButton(
+                    inner_top,
+                    image=addprofile_icon,
+                    text="",
+                    width=40,
+                    height=40,
+                    command=self._open_profile_manager,
+                    fg_color="transparent",
+                    hover_color=("gray80", "gray30")
+                )
+                self.add_profile_btn.image = addprofile_icon  # Keep reference
+            else:
+                # Fallback to emoji if icon not found
+                self.add_profile_btn = ctk.CTkButton(
+                    inner_top,
+                    text="➕",
+                    width=40,
+                    height=40,
+                    command=self._open_profile_manager,
+                    font=("Arial", 20),
+                    fg_color="transparent",
+                    hover_color=("gray80", "gray30")
+                )
+        except Exception as e:
+            print(f"⚠️  Failed to load add profile icon: {e}")
+            self.add_profile_btn = ctk.CTkButton(
+                inner_top,
+                text="➕",
+                width=40,
+                height=40,
+                command=self._open_profile_manager,
+                font=("Arial", 20),
+                fg_color="transparent",
+                hover_color=("gray80", "gray30")
+            )
+
+        self.add_profile_btn.grid(row=0, column=5, padx=(0, 10), sticky="w")
+
         # Statistics button with icon
         try:
-            stats_icon_path = Path(__file__).parent.parent.parent / "Assets" / "stats.png"
+            stats_icon_path = Path(
+                __file__).parent.parent.parent / "Assets" / "stats.png"
             if stats_icon_path.exists():
                 stats_icon = ctk.CTkImage(
                     light_image=Image.open(stats_icon_path),
@@ -437,12 +856,13 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 fg_color="transparent",
                 hover_color=("gray80", "gray30")
             )
-        
-        self.stats_btn.grid(row=0, column=5, padx=(10, 0), sticky="e")
-        
+
+        self.stats_btn.grid(row=0, column=6, padx=(10, 0), sticky="e")
+
         # Settings button with icon
         try:
-            settings_icon_path = Path(__file__).parent.parent.parent / "Assets" / "settings.png"
+            settings_icon_path = Path(
+                __file__).parent.parent.parent / "Assets" / "settings.png"
             if settings_icon_path.exists():
                 settings_icon = ctk.CTkImage(
                     light_image=Image.open(settings_icon_path),
@@ -484,8 +904,8 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 fg_color="transparent",
                 hover_color=("gray80", "gray30")
             )
-        
-        self.settings_btn.grid(row=0, column=6, padx=(5, 0), sticky="e")
+
+        self.settings_btn.grid(row=0, column=7, padx=(5, 0), sticky="e")
 
         # Note: Connect button and status indicator live in the bottom bar now
         # (bottom bar holds the actionable controls). We intentionally do not
@@ -538,7 +958,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             theme_bg = '#ffffff' if mode == 'light' else '#121212'
 
         main_frame = ctk.CTkFrame(parent, fg_color=theme_bg)
-        main_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+        main_frame.grid(row=1, column=0, sticky="nsew", padx=0, pady=0)
 
         # Store reference for theme updates
         self.main_frame = main_frame
@@ -552,7 +972,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         # children show the theme correctly (prevents fallback to hard-coded dark)
         self.content_frame = ctk.CTkFrame(main_frame, fg_color=theme_bg)
         self.content_frame.grid(
-            row=0, column=0, sticky="nsew", padx=10, pady=10)
+            row=0, column=0, sticky="nsew", padx=10, pady=(10, 0))
 
         # Configure content frame grid
         self.content_frame.grid_columnconfigure(0, weight=1)
@@ -618,7 +1038,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         # File gallery (hidden by default)
         self.gallery_visible = False
         self.current_filter = "All"  # All, Images, Documents, Videos, Archives
-        
+
         # Get proper theme background color
         try:
             gallery_bg = self.theme_manager.current_theme.bg_primary
@@ -637,7 +1057,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                     gallery_bg = self.theme_manager.current_theme.bg_primary
             except Exception:
                 gallery_bg = self.theme_manager.current_theme.bg_primary
-        
+
         self.gallery_frame = ctk.CTkScrollableFrame(
             self.content_frame,
             label_text="",
@@ -663,7 +1083,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             border_width=0
         )
         # Don't grid it yet - will be shown on toggle
-        
+
         # Settings page (hidden by default)
         self.settings_frame = ctk.CTkScrollableFrame(
             self.content_frame,
@@ -675,7 +1095,19 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             border_width=0
         )
         # Don't grid it yet - will be shown on toggle
-        
+
+        # Profile Manager page (hidden by default)
+        self.profile_manager_frame = ctk.CTkScrollableFrame(
+            self.content_frame,
+            label_text="",
+            fg_color='transparent',
+            scrollbar_fg_color='transparent',
+            scrollbar_button_color=("gray70", "gray30"),
+            corner_radius=0,
+            border_width=0
+        )
+        # Don't grid it yet - will be shown on toggle
+
         # Apply initial scrollable frame backgrounds
         self._update_scrollable_frame_backgrounds()
 
@@ -683,8 +1115,11 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         frame_colors = self.theme_manager.get_frame_colors()
         bottom_bar = ctk.CTkFrame(main_frame, fg_color=frame_colors.get(
             "fg_color"), corner_radius=12, border_width=1, border_color=frame_colors.get("border_color"))
-        # Touch edges horizontally so the bar spans the full window width
-        bottom_bar.grid(row=1, column=0, sticky="ew", padx=0, pady=(0, 0))
+        # Add margin around bottom bar
+        bottom_bar.grid(row=1, column=0, sticky="ew", padx=10, pady=(10, 10))
+
+        # Store reference for theme updates
+        self.bottom_bar = bottom_bar
 
         # Inner padded area inside the bottom bar so controls don't touch edges
         inner_bottom = ctk.CTkFrame(bottom_bar, fg_color="transparent")
@@ -1383,12 +1818,17 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             if self.statistics_visible:
                 self.statistics_frame.grid_forget()
                 self.statistics_visible = False
-            
+
             # Hide settings if showing
             if self.settings_visible:
                 self.settings_frame.grid_forget()
                 self.settings_visible = False
-            
+
+            # Hide profile manager if showing
+            if self.profile_manager_visible:
+                self.profile_manager_frame.grid_forget()
+                self.profile_manager_visible = False
+
             # Show gallery
             self.drop_icon.grid_forget()
             self.drop_label.grid_forget()
@@ -1910,25 +2350,30 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 # Hide search and filter
                 self.search_entry.grid_forget()
                 self.filter_btn.grid_forget()
-            
+
             # Hide settings if showing
             if self.settings_visible:
                 self.settings_frame.grid_forget()
                 self.settings_visible = False
-            
+
+            # Hide profile manager if showing
+            if self.profile_manager_visible:
+                self.profile_manager_frame.grid_forget()
+                self.profile_manager_visible = False
+
             # Hide drop zone
             self.drop_icon.grid_forget()
             self.drop_label.grid_forget()
             self.browse_btn.grid_forget()
-            
+
             # Show statistics
             self.statistics_frame.grid(
                 row=3, column=0, sticky="nsew", padx=10, pady=10)
             self.statistics_visible = True
-            
+
             # Load statistics content
             self._load_statistics_page()
-    
+
     def _open_settings(self):
         """Toggle settings page visibility"""
         if self.settings_visible:
@@ -1947,22 +2392,27 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 # Hide search and filter
                 self.search_entry.grid_forget()
                 self.filter_btn.grid_forget()
-            
+
             # Hide statistics if showing
             if self.statistics_visible:
                 self.statistics_frame.grid_forget()
                 self.statistics_visible = False
-            
+
+            # Hide profile manager if showing
+            if self.profile_manager_visible:
+                self.profile_manager_frame.grid_forget()
+                self.profile_manager_visible = False
+
             # Hide drop zone
             self.drop_icon.grid_forget()
             self.drop_label.grid_forget()
             self.browse_btn.grid_forget()
-            
+
             # Show settings
             self.settings_frame.grid(
                 row=3, column=0, sticky="nsew", padx=10, pady=10)
             self.settings_visible = True
-            
+
             # Load settings content
             self._load_settings_page()
 
@@ -1974,9 +2424,10 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 widget.destroy()
 
             # Main container with padding
-            container = ctk.CTkFrame(self.settings_frame, fg_color="transparent")
+            container = ctk.CTkFrame(
+                self.settings_frame, fg_color="transparent")
             container.pack(fill="both", expand=True, padx=20, pady=20)
-            
+
             # Title
             title_label = ctk.CTkLabel(
                 container,
@@ -1984,23 +2435,25 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 font=("Arial", 32, "bold")
             )
             title_label.pack(pady=(0, 30))
-            
+
             # Grid container - 2 columns, 2 rows
             grid_container = ctk.CTkFrame(container, fg_color="transparent")
             grid_container.pack(fill="both", expand=True)
-            
+
             # Configure grid weights
             grid_container.grid_columnconfigure(0, weight=1)  # Left column
             grid_container.grid_columnconfigure(1, weight=1)  # Right column
             grid_container.grid_rowconfigure(0, weight=1)     # Top row
             grid_container.grid_rowconfigure(1, weight=1)     # Bottom row
-            
+
             # ============================================================
             # TOP LEFT: Version Info (Row 0, Column 0)
             # ============================================================
-            version_container = ctk.CTkFrame(grid_container, fg_color="transparent")
-            version_container.grid(row=0, column=0, sticky="nsew", padx=(0, 10), pady=(0, 10))
-            
+            version_container = ctk.CTkFrame(
+                grid_container, fg_color="transparent")
+            version_container.grid(
+                row=0, column=0, sticky="nsew", padx=(0, 10), pady=(0, 10))
+
             # App Version
             version_label = ctk.CTkLabel(
                 version_container,
@@ -2008,7 +2461,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 font=("Arial", 16, "bold")
             )
             version_label.pack(anchor="w", pady=(0, 8))
-            
+
             version_value = ctk.CTkLabel(
                 version_container,
                 text=f"v{self.version_manager.get_current_version()}",
@@ -2016,7 +2469,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 text_color=("green", "lightgreen")
             )
             version_value.pack(anchor="w", pady=(0, 20))
-            
+
             # Repository
             repo_label = ctk.CTkLabel(
                 version_container,
@@ -2024,7 +2477,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 font=("Arial", 16, "bold")
             )
             repo_label.pack(anchor="w", pady=(0, 8))
-            
+
             repo_link = ctk.CTkButton(
                 version_container,
                 text=self.version_manager.get_repo_url(),
@@ -2032,28 +2485,32 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 fg_color="transparent",
                 text_color=("black", "white"),
                 hover_color=("gray80", "gray30"),
-                command=lambda: webbrowser.open(self.version_manager.get_repo_url()),
+                command=lambda: webbrowser.open(
+                    self.version_manager.get_repo_url()),
                 anchor="w"
             )
             repo_link.pack(anchor="w", pady=(0, 10))
-            
+
             # ============================================================
             # BOTTOM LEFT: Update Status (Row 1, Column 0)
             # ============================================================
-            update_container = ctk.CTkFrame(grid_container, fg_color="transparent")
-            update_container.grid(row=1, column=0, sticky="nsew", padx=(0, 10), pady=(10, 0))
-            
+            update_container = ctk.CTkFrame(
+                grid_container, fg_color="transparent")
+            update_container.grid(
+                row=1, column=0, sticky="nsew", padx=(0, 10), pady=(10, 0))
+
             # Status indicator
-            status_header = ctk.CTkFrame(update_container, fg_color="transparent")
+            status_header = ctk.CTkFrame(
+                update_container, fg_color="transparent")
             status_header.pack(fill="x", pady=(0, 15))
-            
+
             status_label = ctk.CTkLabel(
                 status_header,
                 text="Update Status:",
                 font=("Arial", 16, "bold")
             )
             status_label.pack(side="left", padx=(0, 15))
-            
+
             self.status_indicator = ctk.CTkLabel(
                 status_header,
                 text="⟳ Checking...",
@@ -2061,7 +2518,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 text_color=("gray50", "gray50")
             )
             self.status_indicator.pack(side="left")
-            
+
             # Latest version info
             self.latest_version_label = ctk.CTkLabel(
                 update_container,
@@ -2070,7 +2527,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 text_color=("gray50", "gray70")
             )
             self.latest_version_label.pack(anchor="w", pady=(0, 15))
-            
+
             # Update button
             self.update_btn = ctk.CTkButton(
                 update_container,
@@ -2081,27 +2538,31 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 state="disabled"
             )
             self.update_btn.pack(fill="x", pady=(0, 15))
-            
+
             # Progress section (hidden initially)
-            self.progress_container = ctk.CTkFrame(update_container, fg_color="transparent")
-            
+            self.progress_container = ctk.CTkFrame(
+                update_container, fg_color="transparent")
+
             self.progress_label = ctk.CTkLabel(
                 self.progress_container,
                 text="",
                 font=("Arial", 13)
             )
             self.progress_label.pack(anchor="w", pady=(0, 8))
-            
-            self.progress_bar = ctk.CTkProgressBar(self.progress_container, height=8)
+
+            self.progress_bar = ctk.CTkProgressBar(
+                self.progress_container, height=8)
             self.progress_bar.pack(fill="x")
             self.progress_bar.set(0)
-            
+
             # ============================================================
             # RIGHT SIDE: Release Notes (Row 0-1, Column 1) - Spans both rows
             # ============================================================
-            notes_container = ctk.CTkFrame(grid_container, fg_color="transparent")
-            notes_container.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=(10, 0))
-            
+            notes_container = ctk.CTkFrame(
+                grid_container, fg_color="transparent")
+            notes_container.grid(row=0, column=1, rowspan=2,
+                                 sticky="nsew", padx=(10, 0))
+
             # Header
             notes_label = ctk.CTkLabel(
                 notes_container,
@@ -2109,7 +2570,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 font=("Arial", 16, "bold")
             )
             notes_label.pack(anchor="w", pady=(0, 10))
-            
+
             # Scrollable text area for release notes
             self.notes_text = ctk.CTkTextbox(
                 notes_container,
@@ -2120,37 +2581,39 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             self.notes_text.pack(fill="both", expand=True)
             self.notes_text.insert("1.0", "Loading release information...")
             self.notes_text.configure(state="disabled")
-            
+
             # Start checking for updates
             self._check_updates()
-            
+
         except Exception as e:
             print(f"⚠️  Failed to load settings page: {e}")
             import traceback
             traceback.print_exc()
-    
+
     def _check_updates(self, force=False):
         """Check for available updates
-        
+
         Args:
             force: If True, bypass cache and force a fresh check
         """
         if hasattr(self, 'status_indicator'):
-            self.status_indicator.configure(text="⟳ Checking...", text_color=("gray50", "gray50"))
+            self.status_indicator.configure(
+                text="⟳ Checking...", text_color=("gray50", "gray50"))
         if hasattr(self, 'update_btn'):
             self.update_btn.configure(state="disabled", text="Checking...")
-        
+
         def callback(success, version, error):
             # Update UI on main thread
-            self.after(0, lambda: self._update_check_complete(success, version, error))
-        
+            self.after(0, lambda: self._update_check_complete(
+                success, version, error))
+
         self.version_manager.check_for_updates(callback, force=force)
-    
+
     def _update_check_complete(self, success, version, error):
         """Handle update check completion"""
         if not hasattr(self, 'status_indicator'):
             return  # Settings page was closed
-            
+
         if success:
             if self.version_manager.update_available:
                 # Update available
@@ -2179,7 +2642,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                     state="normal",
                     text="Check for Updates"
                 )
-            
+
             # Load release notes
             self._load_release_notes()
         else:
@@ -2196,44 +2659,46 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 text="Retry",
                 command=lambda: self._check_updates(force=True)
             )
-    
+
     def _load_release_notes(self):
         """Load release notes from GitHub"""
         if not hasattr(self, 'notes_text'):
             return  # Settings page was closed
-            
+
         try:
             release_info = self.version_manager.latest_release_info
             if release_info:
                 notes = release_info.get("body", "No release notes available.")
                 release_name = release_info.get("name", "")
                 tag_name = release_info.get("tag_name", "")
-                
+
                 self.notes_text.configure(state="normal")
                 self.notes_text.delete("1.0", "end")
-                
+
                 if release_name:
                     self.notes_text.insert("end", f"{release_name}\n\n")
                 elif tag_name:
                     self.notes_text.insert("end", f"{tag_name}\n\n")
-                
+
                 self.notes_text.insert("end", notes)
                 self.notes_text.configure(state="disabled")
             else:
                 self.notes_text.configure(state="normal")
                 self.notes_text.delete("1.0", "end")
-                self.notes_text.insert("1.0", "No release information available.")
+                self.notes_text.insert(
+                    "1.0", "No release information available.")
                 self.notes_text.configure(state="disabled")
         except Exception as e:
             self.notes_text.configure(state="normal")
             self.notes_text.delete("1.0", "end")
-            self.notes_text.insert("1.0", f"Failed to load release notes: {str(e)}")
+            self.notes_text.insert(
+                "1.0", f"Failed to load release notes: {str(e)}")
             self.notes_text.configure(state="disabled")
-    
+
     def _install_update(self):
         """Install the available update"""
         from tkinter import messagebox
-        
+
         # Confirm with user
         response = messagebox.askyesno(
             "Install Update",
@@ -2242,45 +2707,45 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             "The application will need to restart after the update.",
             parent=self
         )
-        
+
         if not response:
             return
-        
+
         # Show progress
         if hasattr(self, 'progress_container'):
             self.progress_container.pack(fill="x", pady=(10, 0))
         if hasattr(self, 'update_btn'):
             self.update_btn.configure(state="disabled")
-        
+
         def progress_callback(stage, message, percent):
             self.after(0, lambda: self._update_progress(message, percent))
-        
+
         def completion_callback(success, message):
             self.after(0, lambda: self._update_complete(success, message))
-        
+
         self.version_manager.download_and_install_update(
             progress_callback,
             completion_callback
         )
-    
+
     def _update_progress(self, message, percent):
         """Update progress display"""
         if hasattr(self, 'progress_label'):
             self.progress_label.configure(text=message)
         if hasattr(self, 'progress_bar'):
             self.progress_bar.set(percent / 100.0)
-    
+
     def _update_complete(self, success, message):
         """Handle update completion"""
         from tkinter import messagebox
-        
+
         if success:
             messagebox.showinfo(
                 "Update Complete",
                 message,
                 parent=self
             )
-            
+
             # Prompt to restart
             restart = messagebox.askyesno(
                 "Restart Required",
@@ -2300,6 +2765,393 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             if hasattr(self, 'progress_container'):
                 self.progress_container.pack_forget()
 
+    def _open_profile_manager(self):
+        """Toggle profile manager page visibility"""
+        if self.profile_manager_visible:
+            # Hide profile manager
+            self.profile_manager_frame.grid_forget()
+            self.drop_icon.grid()
+            self.drop_label.grid()
+            self.browse_btn.grid()
+            self.profile_manager_visible = False
+        else:
+            # Hide gallery if showing
+            if self.gallery_visible:
+                self.gallery_frame.grid_forget()
+                self.gallery_visible = False
+                self.gallery_btn.configure(text="Show Gallery")
+                # Hide search and filter
+                self.search_entry.grid_forget()
+                self.filter_btn.grid_forget()
+
+            # Hide statistics if showing
+            if self.statistics_visible:
+                self.statistics_frame.grid_forget()
+                self.statistics_visible = False
+
+            # Hide settings if showing
+            if self.settings_visible:
+                self.settings_frame.grid_forget()
+                self.settings_visible = False
+
+            # Hide drop zone
+            self.drop_icon.grid_forget()
+            self.drop_label.grid_forget()
+            self.browse_btn.grid_forget()
+
+            # Show profile manager
+            self.profile_manager_frame.grid(
+                row=3, column=0, sticky="nsew", padx=10, pady=10)
+            self.profile_manager_visible = True
+
+            # Load profile manager content
+            self._load_profile_manager_page()
+
+    def _load_profile_manager_page(self):
+        """Load and display profile manager in the main content area"""
+        try:
+            # Clear existing content
+            for widget in self.profile_manager_frame.winfo_children():
+                widget.destroy()
+
+            # Get theme colors
+            frame_colors = self.theme_manager.get_frame_colors()
+            text_color = self.theme_manager.current_theme.text_primary
+
+            # Main container with padding
+            container = ctk.CTkFrame(
+                self.profile_manager_frame, fg_color="transparent")
+            container.pack(fill="both", expand=True, padx=40, pady=(10, 40))
+
+            # Title
+            title_label = ctk.CTkLabel(
+                container,
+                text="Manage Connection Profiles",
+                font=("Segoe UI", 32, "bold"),
+                text_color=text_color
+            )
+            title_label.pack(pady=(0, 10))
+
+            # Subtitle
+            subtitle = ctk.CTkLabel(
+                container,
+                text="Add other people's profiles to connect to their devices (max 2)",
+                font=("Segoe UI", 14),
+                text_color=text_color
+            )
+            subtitle.pack(pady=(0, 30))
+
+            # Get current peer profiles (not including my_profile)
+            profiles = self.config_manager.get_profiles()
+            print(
+                f"🔍 Debug - Profiles found: {len(profiles) if profiles else 0}")
+            if profiles:
+                for p in profiles:
+                    print(f"   - {p.name}: {p.ip}")
+
+            # Add profile button (only if less than 2 profiles) - Show FIRST
+            if len(profiles) < 2:
+                # Get card background color based on theme
+                is_dark = self.theme_manager.current_theme_name == "dark"
+                card_bg = "#2d2d2d" if is_dark else "#f0f0f0"
+
+                add_frame = ctk.CTkFrame(
+                    container,
+                    fg_color=card_bg,
+                    corner_radius=12
+                )
+                add_frame.pack(fill="x", pady=(0, 20))
+
+                # Add new profile section
+                add_title = ctk.CTkLabel(
+                    add_frame,
+                    text="Add New Profile",
+                    font=("Segoe UI", 20, "bold"),
+                    text_color=text_color
+                )
+                add_title.pack(pady=(20, 15), padx=20)
+
+                # Name input
+                name_label = ctk.CTkLabel(
+                    add_frame,
+                    text="Profile Name:",
+                    font=("Segoe UI", 14),
+                    text_color=text_color
+                )
+                name_label.pack(pady=(0, 5), padx=20, anchor="w")
+
+                self.new_profile_name_entry = ctk.CTkEntry(
+                    add_frame,
+                    font=("Segoe UI", 14),
+                    height=40,
+                    placeholder_text="e.g., Friend's PC"
+                )
+                self.new_profile_name_entry.pack(
+                    pady=(0, 15), padx=20, fill="x")
+
+                # Address input
+                address_label = ctk.CTkLabel(
+                    add_frame,
+                    text="Tailscale IP Address:",
+                    font=("Segoe UI", 14),
+                    text_color=text_color
+                )
+                address_label.pack(pady=(0, 5), padx=20, anchor="w")
+
+                self.new_profile_address_entry = ctk.CTkEntry(
+                    add_frame,
+                    font=("Segoe UI", 14),
+                    height=40,
+                    placeholder_text="e.g., 100.64.0.2"
+                )
+                self.new_profile_address_entry.pack(
+                    pady=(0, 15), padx=20, fill="x")
+
+                # Error label
+                self.profile_error_label = ctk.CTkLabel(
+                    add_frame,
+                    text="",
+                    font=("Segoe UI", 12),
+                    text_color="#ef4444"
+                )
+                self.profile_error_label.pack(pady=(0, 10), padx=20)
+
+                # Add button with icon
+                addprofile_icon_path = Path(
+                    __file__).parent.parent.parent / "Assets" / "addprofile.png"
+                if addprofile_icon_path.exists():
+                    addprofile_icon = ctk.CTkImage(
+                        light_image=Image.open(addprofile_icon_path),
+                        dark_image=Image.open(addprofile_icon_path),
+                        size=(20, 20)
+                    )
+                    add_btn = ctk.CTkButton(
+                        add_frame,
+                        text="  Add Profile",
+                        image=addprofile_icon,
+                        compound="left",
+                        font=("Segoe UI", 14, "bold"),
+                        height=40,
+                        command=self._add_new_profile,
+                        fg_color="#22c55e",
+                        hover_color="#16a34a"
+                    )
+                else:
+                    add_btn = ctk.CTkButton(
+                        add_frame,
+                        text="➕  Add Profile",
+                        font=("Segoe UI", 14, "bold"),
+                        height=40,
+                        command=self._add_new_profile,
+                        fg_color="#22c55e",
+                        hover_color="#16a34a"
+                    )
+                add_btn.pack(pady=(0, 20), padx=20, fill="x")
+
+            # Profile list container (only show if there are profiles) - Show AFTER add section
+            if profiles and len(profiles) > 0:
+                profiles_container = ctk.CTkFrame(
+                    container, fg_color="transparent")
+                profiles_container.pack(fill="both", expand=True, pady=(0, 20))
+
+                # Display existing profiles
+                for idx, profile in enumerate(profiles):
+                    self._create_profile_card(profiles_container, profile, idx)
+
+            # Tailscale Setup Guide Section
+            is_dark = self.theme_manager.current_theme_name == "dark"
+            guide_bg = "#2d2d2d" if is_dark else "#f0f0f0"
+
+            guide_frame = ctk.CTkFrame(
+                container,
+                fg_color=guide_bg,
+                corner_radius=12
+            )
+            guide_frame.pack(fill="x", pady=(20, 0))
+
+            # Guide title and link
+            guide_label = ctk.CTkLabel(
+                guide_frame,
+                text="Need help? Check the Tailscale Setup Guide:",
+                font=("Segoe UI", 14),
+                text_color=text_color,
+                anchor="w"
+            )
+            guide_label.pack(pady=(15, 5), padx=20, anchor="w")
+
+            # Clickable link button
+            link_btn = ctk.CTkButton(
+                guide_frame,
+                text="https://tailscale.com/kb/1017/install",
+                font=("Segoe UI", 13, "underline"),
+                text_color=("#1e40af", "#60a5fa"),
+                fg_color="transparent",
+                hover_color=("gray90", "gray20"),
+                anchor="w",
+                command=lambda: self._open_url(
+                    "https://tailscale.com/kb/1017/install")
+            )
+            link_btn.pack(pady=(0, 15), padx=20, anchor="w")
+
+        except Exception as e:
+            import traceback
+            print(f"❌ Error loading profile manager: {e}")
+            traceback.print_exc()
+
+    def _create_profile_card(self, parent, profile, index):
+        """Create a card for displaying and editing a profile"""
+        text_color = self.theme_manager.current_theme.text_primary
+
+        # Get card background color based on theme
+        is_dark = self.theme_manager.current_theme_name == "dark"
+        card_bg = "#2d2d2d" if is_dark else "#f0f0f0"
+
+        # Profile card
+        card = ctk.CTkFrame(
+            parent,
+            fg_color=card_bg,
+            corner_radius=12
+        )
+        card.pack(fill="x", pady=(0, 15))
+
+        # Profile info container
+        info_container = ctk.CTkFrame(card, fg_color="transparent")
+        info_container.pack(fill="x", padx=20, pady=20)
+        info_container.grid_columnconfigure(0, weight=1)
+        info_container.grid_columnconfigure(1, weight=0)
+
+        # Name
+        name_label = ctk.CTkLabel(
+            info_container,
+            text=f"{profile.name}",
+            font=("Segoe UI", 18, "bold"),
+            text_color=text_color,
+            anchor="w"
+        )
+        name_label.grid(row=0, column=0, sticky="w", pady=(0, 5))
+
+        # IP
+        ip_label = ctk.CTkLabel(
+            info_container,
+            text=f"IP: {profile.ip}",
+            font=("Segoe UI", 14),
+            text_color=text_color,
+            anchor="w"
+        )
+        ip_label.grid(row=1, column=0, sticky="w")
+
+        # Delete button with icon
+        deleteprofile_icon_path = Path(
+            __file__).parent.parent.parent / "Assets" / "deleteprofile.png"
+        if deleteprofile_icon_path.exists():
+            deleteprofile_icon = ctk.CTkImage(
+                light_image=Image.open(deleteprofile_icon_path),
+                dark_image=Image.open(deleteprofile_icon_path),
+                size=(24, 24)
+            )
+            delete_btn = ctk.CTkButton(
+                info_container,
+                image=deleteprofile_icon,
+                text="",
+                width=40,
+                height=40,
+                command=lambda: self._delete_profile(profile.name),
+                fg_color="transparent",
+                hover_color=("gray80", "gray30")
+            )
+            delete_btn.image = deleteprofile_icon  # Keep reference
+        else:
+            # Fallback to emoji if icon not found
+            delete_btn = ctk.CTkButton(
+                info_container,
+                text="🗑️",
+                width=40,
+                height=40,
+                font=("Arial", 16),
+                command=lambda: self._delete_profile(profile.name),
+                fg_color="transparent",
+                hover_color=("gray80", "gray30")
+            )
+        delete_btn.grid(row=0, column=1, rowspan=2, padx=(10, 0))
+
+    def _add_new_profile(self):
+        """Add a new profile from the profile manager"""
+        name = self.new_profile_name_entry.get().strip()
+        address = self.new_profile_address_entry.get().strip()
+
+        # Validate inputs
+        if not name:
+            self.profile_error_label.configure(
+                text="Please enter a profile name")
+            return
+
+        if not address:
+            self.profile_error_label.configure(
+                text="Please enter a Tailscale IP address")
+            return
+
+        # Basic IP validation
+        if not self._validate_ip(address):
+            self.profile_error_label.configure(
+                text="Please enter a valid IP address (e.g., 100.64.0.1)")
+            return
+
+        # Create the profile
+        try:
+            self.config_manager.add_profile(name, address)
+            self.config_manager.save_profiles()
+
+            print(f"✅ Profile added: {name} ({address})")
+
+            # Clear inputs
+            self.new_profile_name_entry.delete(0, 'end')
+            self.new_profile_address_entry.delete(0, 'end')
+            self.profile_error_label.configure(text="")
+
+            # Reload the page
+            self._load_profile_manager_page()
+
+            # Refresh profile dropdowns
+            self._refresh_profiles()
+
+        except Exception as e:
+            self.profile_error_label.configure(
+                text=f"Failed to add profile: {str(e)}")
+
+    def _delete_profile(self, profile_name):
+        """Delete a profile"""
+        from tkinter import messagebox
+
+        # Confirm deletion
+        confirm = messagebox.askyesno(
+            "Delete Profile",
+            f"Are you sure you want to delete the profile '{profile_name}'?",
+            parent=self
+        )
+
+        if confirm:
+            try:
+                # Find and remove the profile
+                self.config_manager.profiles = [
+                    p for p in self.config_manager.profiles if p.name != profile_name
+                ]
+                self.config_manager.save_profiles()
+
+                print(f"✅ Profile deleted: {profile_name}")
+
+                # Reload the page
+                self._load_profile_manager_page()
+
+                # Refresh profile dropdowns
+                self._refresh_profiles()
+
+            except Exception as e:
+                messagebox.showerror(
+                    "Error",
+                    f"Failed to delete profile: {str(e)}",
+                    parent=self
+                )
+
     def _load_statistics_page(self):
         """Load and display statistics in the main content area"""
         try:
@@ -2309,18 +3161,18 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
 
             # Get history from file manager
             history = self.file_manager.get_history()
-            
+
             # Calculate statistics
             total_transfers = len(history)
             total_bytes = sum(item.get('size', 0) for item in history.values())
             total_mb = total_bytes / (1024 * 1024)
             total_gb = total_bytes / (1024 * 1024 * 1024)
-            
+
             # Count by type (sent vs received)
             sent_count = sum(1 for item in history.values() if item.get(
                 'sender') == self.my_profile_var.get())
             received_count = total_transfers - sent_count
-            
+
             # File format statistics
             format_stats = {}
             for item in history.values():
@@ -2328,23 +3180,24 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 if ext not in format_stats:
                     format_stats[ext] = 0
                 format_stats[ext] += 1
-            
+
             # Per-user statistics
             user_stats = {}
             for item in history.values():
                 sender = item.get('sender', 'Unknown')
                 receiver = item.get('receiver', 'Unknown')
                 size = item.get('size', 0)
-                
+
                 # Track sent data
                 if sender not in user_stats:
                     user_stats[sender] = {'sent': 0, 'received': 0, 'count': 0}
                 user_stats[sender]['sent'] += size
                 user_stats[sender]['count'] += 1
-                
+
                 # Track received data
                 if receiver not in user_stats:
-                    user_stats[receiver] = {'sent': 0, 'received': 0, 'count': 0}
+                    user_stats[receiver] = {
+                        'sent': 0, 'received': 0, 'count': 0}
                 user_stats[receiver]['received'] += size
 
             # Compact mode - show pie chart
@@ -2365,49 +3218,54 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                         matplotlib.use('Agg')  # Non-interactive backend
                         import matplotlib.pyplot as plt
                         from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-                        
+
                         # Sort and get top 5 formats
-                        sorted_formats = sorted(format_stats.items(), key=lambda x: x[1], reverse=True)[:5]
+                        sorted_formats = sorted(
+                            format_stats.items(), key=lambda x: x[1], reverse=True)[:5]
                         labels = [ext for ext, _ in sorted_formats]
                         sizes = [count for _, count in sorted_formats]
-                        colors = ["#e74c3c", "#3498db", "#2ecc71", "#f39c12", "#9b59b6"]
-                        
+                        colors = ["#e74c3c", "#3498db",
+                                  "#2ecc71", "#f39c12", "#9b59b6"]
+
                         # Create figure with dark/light background based on theme
                         is_dark = self.theme_manager.current_theme_name == "dark"
                         fig_bg = "#2b2b2b" if is_dark else "#f0f0f0"
                         text_color = "#e0e0e0" if is_dark else "#1a1a1a"
-                        
-                        fig, ax = plt.subplots(figsize=(5, 5), facecolor=fig_bg)
+
+                        fig, ax = plt.subplots(
+                            figsize=(5, 5), facecolor=fig_bg)
                         ax.set_facecolor(fig_bg)
-                        
+
                         # Create pie chart
                         wedges, texts, autotexts = ax.pie(
-                            sizes, 
-                            labels=labels, 
+                            sizes,
+                            labels=labels,
                             colors=colors,
                             autopct='%1.0f%%',
                             startangle=90,
-                            textprops={'color': text_color, 'fontsize': 11, 'weight': 'bold'}
+                            textprops={'color': text_color,
+                                       'fontsize': 11, 'weight': 'bold'}
                         )
-                        
+
                         # Equal aspect ratio ensures circular pie
                         ax.axis('equal')
-                        
+
                         # Embed in tkinter
                         chart_container = ctk.CTkFrame(
                             self.statistics_frame,
                             fg_color=("gray90", "gray20"),
                             corner_radius=12
                         )
-                        chart_container.pack(pady=10, padx=15, fill="both", expand=True)
-                        
+                        chart_container.pack(
+                            pady=10, padx=15, fill="both", expand=True)
+
                         canvas = FigureCanvasTkAgg(fig, master=chart_container)
                         canvas.draw()
                         canvas.get_tk_widget().pack(pady=10, padx=10, fill="both", expand=True)
-                        
+
                         # Close the figure to free memory
                         plt.close(fig)
-                        
+
                     except ImportError:
                         # Fallback to bar chart if matplotlib not available
                         format_section = ctk.CTkFrame(
@@ -2415,19 +3273,26 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                             fg_color=("gray90", "gray20"),
                             corner_radius=12
                         )
-                        format_section.pack(pady=10, padx=15, fill="both", expand=True)
-                        
-                        sorted_formats = sorted(format_stats.items(), key=lambda x: x[1], reverse=True)[:5]
-                        chart_frame = ctk.CTkFrame(format_section, fg_color="transparent")
-                        chart_frame.pack(pady=15, padx=15, fill="both", expand=True)
-                        
-                        bar_colors = ["#e74c3c", "#3498db", "#2ecc71", "#f39c12", "#9b59b6"]
-                        max_count = max([count for _, count in sorted_formats]) if sorted_formats else 1
-                        
+                        format_section.pack(
+                            pady=10, padx=15, fill="both", expand=True)
+
+                        sorted_formats = sorted(
+                            format_stats.items(), key=lambda x: x[1], reverse=True)[:5]
+                        chart_frame = ctk.CTkFrame(
+                            format_section, fg_color="transparent")
+                        chart_frame.pack(pady=15, padx=15,
+                                         fill="both", expand=True)
+
+                        bar_colors = ["#e74c3c", "#3498db",
+                                      "#2ecc71", "#f39c12", "#9b59b6"]
+                        max_count = max(
+                            [count for _, count in sorted_formats]) if sorted_formats else 1
+
                         for idx, (ext, count) in enumerate(sorted_formats):
-                            row_frame = ctk.CTkFrame(chart_frame, fg_color="transparent")
+                            row_frame = ctk.CTkFrame(
+                                chart_frame, fg_color="transparent")
                             row_frame.pack(fill="x", pady=6)
-                            
+
                             ext_label = ctk.CTkLabel(
                                 row_frame,
                                 text=f"{ext}:",
@@ -2437,7 +3302,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                                 text_color=("gray10", "gray90")
                             )
                             ext_label.pack(side="left", padx=(0, 8))
-                            
+
                             bar_width = int((count / max_count) * 200)
                             bar = ctk.CTkFrame(
                                 row_frame,
@@ -2448,14 +3313,15 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                             )
                             bar.pack(side="left", padx=(0, 8))
                             bar.pack_propagate(False)
-                            
+
                             count_label = ctk.CTkLabel(
                                 bar,
                                 text=f"{count}",
                                 font=("Arial", 11, "bold"),
                                 text_color="white"
                             )
-                            count_label.place(relx=0.5, rely=0.5, anchor="center")
+                            count_label.place(
+                                relx=0.5, rely=0.5, anchor="center")
                 else:
                     # No data message
                     no_data = ctk.CTkLabel(
@@ -2465,7 +3331,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                         text_color="gray"
                     )
                     no_data.pack(pady=40)
-                
+
                 return  # Exit early for compact mode
 
             # Normal mode - full statistics view
@@ -2479,13 +3345,14 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             title.pack(pady=(20, 30))
 
             # Top metrics row with colorful cards
-            metrics_row = ctk.CTkFrame(self.statistics_frame, fg_color="transparent")
+            metrics_row = ctk.CTkFrame(
+                self.statistics_frame, fg_color="transparent")
             metrics_row.pack(pady=10, padx=20, fill="x")
-            
+
             # Configure columns for even distribution
             for i in range(4):
                 metrics_row.grid_columnconfigure(i, weight=1)
-            
+
             # Metric cards
             metrics = [
                 ("Total Transfers", f"{total_transfers}", "#3498db"),  # Blue
@@ -2493,7 +3360,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 ("Files Sent", f"{sent_count}", "#e74c3c"),  # Red
                 ("Files Received", f"{received_count}", "#f39c12"),  # Orange
             ]
-            
+
             for idx, (label, value, color) in enumerate(metrics):
                 card = ctk.CTkFrame(
                     metrics_row,
@@ -2501,7 +3368,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                     corner_radius=12
                 )
                 card.grid(row=0, column=idx, padx=10, pady=5, sticky="ew")
-                
+
                 value_label = ctk.CTkLabel(
                     card,
                     text=value,
@@ -2509,7 +3376,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                     text_color="white"
                 )
                 value_label.pack(pady=(15, 5))
-                
+
                 name_label = ctk.CTkLabel(
                     card,
                     text=label,
@@ -2526,7 +3393,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                     corner_radius=12
                 )
                 format_section.pack(pady=20, padx=20, fill="both")
-                
+
                 format_title = ctk.CTkLabel(
                     format_section,
                     text="📁 Most Sent File Formats",
@@ -2534,23 +3401,28 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                     text_color=("gray10", "gray90")
                 )
                 format_title.pack(pady=(15, 10))
-                
+
                 # Sort formats by count
-                sorted_formats = sorted(format_stats.items(), key=lambda x: x[1], reverse=True)[:6]
-                
+                sorted_formats = sorted(
+                    format_stats.items(), key=lambda x: x[1], reverse=True)[:6]
+
                 # Create visual bar chart
-                chart_frame = ctk.CTkFrame(format_section, fg_color="transparent")
+                chart_frame = ctk.CTkFrame(
+                    format_section, fg_color="transparent")
                 chart_frame.pack(pady=10, padx=30, fill="both", expand=True)
-                
+
                 # Colors for bars
-                bar_colors = ["#e74c3c", "#3498db", "#2ecc71", "#f39c12", "#9b59b6", "#1abc9c"]
-                
-                max_count = max([count for _, count in sorted_formats]) if sorted_formats else 1
-                
+                bar_colors = ["#e74c3c", "#3498db", "#2ecc71",
+                              "#f39c12", "#9b59b6", "#1abc9c"]
+
+                max_count = max(
+                    [count for _, count in sorted_formats]) if sorted_formats else 1
+
                 for idx, (ext, count) in enumerate(sorted_formats):
-                    row_frame = ctk.CTkFrame(chart_frame, fg_color="transparent")
+                    row_frame = ctk.CTkFrame(
+                        chart_frame, fg_color="transparent")
                     row_frame.pack(fill="x", pady=8)
-                    
+
                     # Extension label
                     ext_label = ctk.CTkLabel(
                         row_frame,
@@ -2561,7 +3433,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                         text_color=("gray10", "gray90")
                     )
                     ext_label.pack(side="left", padx=(0, 10))
-                    
+
                     # Progress bar as visual representation
                     bar_width = int((count / max_count) * 400)
                     bar = ctk.CTkFrame(
@@ -2573,7 +3445,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                     )
                     bar.pack(side="left", padx=(0, 10))
                     bar.pack_propagate(False)
-                    
+
                     # Count label on bar
                     count_label = ctk.CTkLabel(
                         bar,
@@ -2591,7 +3463,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                     corner_radius=12
                 )
                 users_section.pack(pady=20, padx=20, fill="both")
-                
+
                 users_title = ctk.CTkLabel(
                     users_section,
                     text="👥 Per-User Statistics",
@@ -2600,7 +3472,8 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 )
                 users_title.pack(pady=(15, 10))
 
-                users_grid = ctk.CTkFrame(users_section, fg_color="transparent")
+                users_grid = ctk.CTkFrame(
+                    users_section, fg_color="transparent")
                 users_grid.pack(pady=10, padx=20, fill="both")
 
                 for idx, (user, stats) in enumerate(sorted(user_stats.items(), key=lambda x: x[1]['count'], reverse=True)):
@@ -2623,33 +3496,39 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                     # Stats in columns
                     stats_row = ctk.CTkFrame(user_card, fg_color="transparent")
                     stats_row.pack(pady=(0, 12), padx=15, fill="x")
-                    
+
                     sent_mb = stats['sent'] / (1024 * 1024)
                     received_mb = stats['received'] / (1024 * 1024)
-                    
+
                     # Transfers count
-                    transfers_frame = ctk.CTkFrame(stats_row, fg_color="#3498db", corner_radius=8)
-                    transfers_frame.pack(side="left", padx=(0, 10), ipadx=15, ipady=8)
+                    transfers_frame = ctk.CTkFrame(
+                        stats_row, fg_color="#3498db", corner_radius=8)
+                    transfers_frame.pack(
+                        side="left", padx=(0, 10), ipadx=15, ipady=8)
                     ctk.CTkLabel(
                         transfers_frame,
                         text=f"📊 {stats['count']} transfers",
                         font=("Arial", 12, "bold"),
                         text_color="white"
                     ).pack()
-                    
+
                     # Sent data
-                    sent_frame = ctk.CTkFrame(stats_row, fg_color="#e74c3c", corner_radius=8)
-                    sent_frame.pack(side="left", padx=(0, 10), ipadx=15, ipady=8)
+                    sent_frame = ctk.CTkFrame(
+                        stats_row, fg_color="#e74c3c", corner_radius=8)
+                    sent_frame.pack(side="left", padx=(
+                        0, 10), ipadx=15, ipady=8)
                     ctk.CTkLabel(
                         sent_frame,
                         text=f"� Sent: {sent_mb:.1f} MB",
                         font=("Arial", 12, "bold"),
                         text_color="white"
                     ).pack()
-                    
+
                     # Received data
-                    received_frame = ctk.CTkFrame(stats_row, fg_color="#2ecc71", corner_radius=8)
-                    received_frame.pack(side="left", padx=(0, 10), ipadx=15, ipady=8)
+                    received_frame = ctk.CTkFrame(
+                        stats_row, fg_color="#2ecc71", corner_radius=8)
+                    received_frame.pack(
+                        side="left", padx=(0, 10), ipadx=15, ipady=8)
                     ctk.CTkLabel(
                         received_frame,
                         text=f"📥 Received: {received_mb:.1f} MB",
@@ -2865,20 +3744,34 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 bg_color = '#ffffff'
             else:
                 bg_color = self.theme_manager.current_theme.bg_primary
-            
+
+            # Update content frame
+            if hasattr(self, 'content_frame'):
+                try:
+                    self.content_frame.configure(fg_color=bg_color)
+                except Exception as e:
+                    print(f"⚠️  Failed to update content frame: {e}")
+
             # Update statistics frame
             if hasattr(self, 'statistics_frame'):
                 try:
                     self.statistics_frame.configure(fg_color=bg_color)
                 except Exception as e:
                     print(f"⚠️  Failed to update statistics frame: {e}")
-            
+
             # Update settings frame
             if hasattr(self, 'settings_frame'):
                 try:
                     self.settings_frame.configure(fg_color=bg_color)
                 except Exception as e:
                     print(f"⚠️  Failed to update settings frame: {e}")
+
+            # Reload profile manager if visible to update colors
+            if hasattr(self, 'profile_manager_visible') and self.profile_manager_visible:
+                try:
+                    self._load_profile_manager_page()
+                except Exception as e:
+                    print(f"⚠️  Failed to update profile manager: {e}")
         except Exception as e:
             print(f"⚠️  Failed to update scrollable frame backgrounds: {e}")
 
@@ -2898,7 +3791,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         # Toggle theme
         self.theme_manager.toggle_theme()
         ctk.set_appearance_mode(self.theme_manager.get_ctk_theme_mode())
-        
+
         # Update scrollable frame backgrounds for new theme
         self._update_scrollable_frame_backgrounds()
 

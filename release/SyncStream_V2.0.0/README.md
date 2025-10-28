@@ -115,35 +115,58 @@ cd SyncStream
 # Install dependencies
 pip install -r requirements.txt
 
-# Copy the profile template
-copy config\profiles.json.template config\profiles.json
-
-# Edit profiles.json with your Tailscale IPs and peer names
-
 # Run SyncStream
 python src/syncstream.py
 ```
+
+On first launch, SyncStream will guide you through a quick onboarding process to set up your first profile.
+
+---
+
+## First Time Setup
+
+### Installing Tailscale
+
+If you don't have Tailscale installed:
+
+1. Visit https://tailscale.com/kb/1017/install
+2. Download and install Tailscale for your operating system
+3. Sign in and connect to your Tailscale network
+4. Note your Tailscale IP address (shown in the Tailscale app)
+
+### Onboarding Process
+
+When you first launch SyncStream, you'll see the onboarding screen:
+
+1. **Open Tailscale Setup Guide** - Click this if you need to install Tailscale
+2. **Profile Name** - Enter a friendly name for your device (e.g., "My Laptop")
+3. **Your Tailscale IP** - Enter your Tailscale IP address (e.g., "100.64.0.1")
+4. **Create Profile** - Click to save your profile and start using SyncStream
+
+You can skip the onboarding and set up profiles manually later if preferred.
 
 ---
 
 ## Configuration
 
-### Setting Up Profiles
+### Adding More Profiles
 
-1. Copy `config/profiles.json.template` to `config/profiles.json`
-2. Edit the file with your peer information:
+After initial setup, you can add more profiles:
+
+1. Edit `config/profiles.json` directly
+2. Add new profile entries with peer information:
 
 ```json
 {
   "profiles": [
     {
-      "name": "YourName",
-      "ip": "100.x.x.x",
+      "name": "My Laptop",
+      "ip": "100.64.0.1",
       "port": 12345
     },
     {
-      "name": "PeerName",
-      "ip": "100.y.y.y",
+      "name": "Friend's PC",
+      "ip": "100.64.0.2",
       "port": 12345
     }
   ],
@@ -152,7 +175,7 @@ python src/syncstream.py
 }
 ```
 
-3. Save and launch SyncStream
+3. Restart SyncStream to load the new profiles
 
 ### Application Settings
 
@@ -242,8 +265,9 @@ TBC (not sure yet)
 - Powered by [Tailscale](https://tailscale.com/) for networking
 
 ---
-1. START.bat          ← Checks everything and launches!
-2. Or setup.bat       ← If you need to install first
-3. Then run.bat       ← To launch directly
+
+1. START.bat ← Checks everything and launches!
+2. Or setup.bat ← If you need to install first
+3. Then run.bat ← To launch directly
 
 **Made with ❤️ for seamless file sharing**

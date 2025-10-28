@@ -110,7 +110,9 @@ def build_executable():
         '--hidden-import', 'core.network_manager',
         '--hidden-import', 'core.file_manager',
         '--hidden-import', 'core.transfer_protocol',
+        '--hidden-import', 'utils.version_manager',  # Version checking
         '--hidden-import', 'PIL._tkinter_finder',  # PIL/Pillow for thumbnails
+        '--collect-all', 'requests',  # HTTP library and all dependencies
         '--collect-all', 'customtkinter',  # Collect all CustomTkinter files
         '--collect-all', 'tkinterdnd2',  # Collect all drag-drop files
         '--clean',  # Clean cache before building

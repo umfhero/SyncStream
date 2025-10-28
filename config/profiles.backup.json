@@ -1,0 +1,24 @@
+{
+  "profiles": [
+    {
+      "name": "Majid",
+      "ip": "100.93.161.73",
+      "port": 12345,
+      "description": "Majid's primary profile"
+    },
+    {
+      "name": "Majid 2.0",
+      "ip": "100.92.141.68",
+      "port": 12345,
+      "description": "Majid's secondary profile"
+    },
+    {
+      "name": "Nathan",
+      "ip": "100.122.120.65",
+      "port": 12345,
+      "description": "Nathan's profile"
+    }
+  ],
+  "last_profile": null,
+  "last_peer": null
+}
