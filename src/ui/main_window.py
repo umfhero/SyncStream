@@ -656,8 +656,8 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         self.statistics_frame = ctk.CTkScrollableFrame(
             self.content_frame,
             label_text="",
-            fg_color="transparent",
-            scrollbar_fg_color="transparent",
+            fg_color='transparent',
+            scrollbar_fg_color='transparent',
             scrollbar_button_color=("gray70", "gray30"),
             corner_radius=0,
             border_width=0
@@ -668,13 +668,16 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         self.settings_frame = ctk.CTkScrollableFrame(
             self.content_frame,
             label_text="",
-            fg_color="transparent",
-            scrollbar_fg_color="transparent",
+            fg_color='transparent',
+            scrollbar_fg_color='transparent',
             scrollbar_button_color=("gray70", "gray30"),
             corner_radius=0,
             border_width=0
         )
         # Don't grid it yet - will be shown on toggle
+        
+        # Apply initial scrollable frame backgrounds
+        self._update_scrollable_frame_backgrounds()
 
         # Bottom bar - single rounded clean bar for gallery controls
         frame_colors = self.theme_manager.get_frame_colors()
@@ -2850,6 +2853,35 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         except Exception as e:
             print(f"⚠️  Disconnect error: {e}")
 
+    def _update_scrollable_frame_backgrounds(self):
+        """Update internal backgrounds of scrollable frames based on current theme"""
+        try:
+            tm_name = getattr(self.theme_manager, 'current_theme_name', None)
+            if tm_name and str(tm_name).lower().startswith('light'):
+                bg_color = '#ffffff'
+            else:
+                bg_color = self.theme_manager.current_theme.bg_primary
+            
+            # Update statistics frame - both the frame itself and internal components
+            if hasattr(self, 'statistics_frame'):
+                try:
+                    self.statistics_frame.configure(fg_color=bg_color)
+                    self.statistics_frame._parent_canvas.configure(bg=bg_color)
+                    self.statistics_frame._parent_frame.configure(bg=bg_color)
+                except Exception as e:
+                    print(f"⚠️  Failed to update statistics frame: {e}")
+            
+            # Update settings frame - both the frame itself and internal components
+            if hasattr(self, 'settings_frame'):
+                try:
+                    self.settings_frame.configure(fg_color=bg_color)
+                    self.settings_frame._parent_canvas.configure(bg=bg_color)
+                    self.settings_frame._parent_frame.configure(bg=bg_color)
+                except Exception as e:
+                    print(f"⚠️  Failed to update settings frame: {e}")
+        except Exception as e:
+            print(f"⚠️  Failed to update scrollable frame backgrounds: {e}")
+
     def _toggle_theme(self):
         """Toggle between light and dark theme with smooth transition"""
         # Fade out effect
@@ -2866,6 +2898,9 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         # Toggle theme
         self.theme_manager.toggle_theme()
         ctk.set_appearance_mode(self.theme_manager.get_ctk_theme_mode())
+        
+        # Update scrollable frame backgrounds for new theme
+        self._update_scrollable_frame_backgrounds()
 
         # Keep the app icon static (blackp2p.ico) regardless of theme
         try:
