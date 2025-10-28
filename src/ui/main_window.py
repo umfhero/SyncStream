@@ -11,6 +11,10 @@ import os
 import sys
 from typing import Optional
 
+# Import version manager
+from utils.version_manager import VersionManager
+from ui.settings_window import SettingsWindow
+
 try:
     from tkinterdnd2 import DND_FILES, TkinterDnD
     DRAG_DROP_AVAILABLE = True
@@ -56,6 +60,9 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         self.theme_manager = theme_manager
         self.network_manager = network_manager
         self.file_manager = file_manager
+        
+        # Initialize version manager
+        self.version_manager = VersionManager()
 
         # Set assets path for use throughout the app
         self.assets_path = get_resource_path("Assets")
@@ -132,6 +139,10 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         # Track drag-drop state
         self.is_dragging = False
         self.original_window_fg = None
+
+        # Track view states
+        self.gallery_visible = False
+        self.statistics_visible = False
 
         # Save files on close
         self.protocol("WM_DELETE_WINDOW", self._on_window_close)
@@ -319,6 +330,8 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         inner_top.grid_columnconfigure(2, weight=0)  # Pipe
         inner_top.grid_columnconfigure(3, weight=0)  # Connect to label
         inner_top.grid_columnconfigure(4, weight=1)  # Peer selector - expands
+        inner_top.grid_columnconfigure(5, weight=0)  # Stats button
+        inner_top.grid_columnconfigure(6, weight=0)  # Settings button
 
         # My Profile label
         my_profile_label = ctk.CTkLabel(
@@ -373,6 +386,100 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         )
         self.peer_profile_selector.grid(
             row=0, column=4, padx=(0, 10), sticky="w")
+
+        # Statistics button with icon
+        try:
+            stats_icon_path = Path(__file__).parent.parent.parent / "Assets" / "stats.png"
+            if stats_icon_path.exists():
+                stats_icon = ctk.CTkImage(
+                    light_image=Image.open(stats_icon_path),
+                    dark_image=Image.open(stats_icon_path),
+                    size=(24, 24)
+                )
+                self.stats_btn = ctk.CTkButton(
+                    inner_top,
+                    image=stats_icon,
+                    text="",
+                    width=40,
+                    height=40,
+                    command=self._toggle_statistics,
+                    fg_color="transparent",
+                    hover_color=("gray80", "gray30")
+                )
+                self.stats_btn.image = stats_icon  # Keep reference
+            else:
+                # Fallback to emoji if icon not found
+                self.stats_btn = ctk.CTkButton(
+                    inner_top,
+                    text="📊",
+                    width=40,
+                    height=40,
+                    command=self._toggle_statistics,
+                    font=("Arial", 20),
+                    fg_color="transparent",
+                    hover_color=("gray80", "gray30")
+                )
+        except Exception as e:
+            print(f"⚠️  Failed to load stats icon: {e}")
+            self.stats_btn = ctk.CTkButton(
+                inner_top,
+                text="📊",
+                width=40,
+                height=40,
+                command=self._toggle_statistics,
+                font=("Arial", 20),
+                fg_color="transparent",
+                hover_color=("gray80", "gray30")
+            )
+        
+        self.stats_btn.grid(row=0, column=5, padx=(10, 0), sticky="e")
+        
+        # Settings button with icon
+        try:
+            settings_icon_path = Path(__file__).parent.parent.parent / "Assets" / "settings.png"
+            if settings_icon_path.exists():
+                settings_icon = ctk.CTkImage(
+                    light_image=Image.open(settings_icon_path),
+                    dark_image=Image.open(settings_icon_path),
+                    size=(24, 24)
+                )
+                self.settings_btn = ctk.CTkButton(
+                    inner_top,
+                    image=settings_icon,
+                    text="",
+                    width=40,
+                    height=40,
+                    command=self._open_settings,
+                    fg_color="transparent",
+                    hover_color=("gray80", "gray30")
+                )
+                self.settings_btn.image = settings_icon  # Keep reference
+            else:
+                # Fallback to emoji if icon not found
+                self.settings_btn = ctk.CTkButton(
+                    inner_top,
+                    text="⚙️",
+                    width=40,
+                    height=40,
+                    command=self._open_settings,
+                    font=("Arial", 20),
+                    fg_color="transparent",
+                    hover_color=("gray80", "gray30")
+                )
+        except Exception as e:
+            print(f"⚠️  Failed to load settings icon: {e}")
+            self.settings_btn = ctk.CTkButton(
+                inner_top,
+                text="⚙️",
+                width=40,
+                height=40,
+                command=self._open_settings,
+                font=("Arial", 20),
+                fg_color="transparent",
+                hover_color=("gray80", "gray30")
+            )
+        
+        self.settings_btn.grid(row=0, column=6, padx=(5, 0), sticky="e")
 
         # Note: Connect button and status indicator live in the bottom bar now
         # (bottom bar holds the actionable controls). We intentionally do not
@@ -515,6 +622,14 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         # Bind mousewheel for row-based scrolling
         self._bind_gallery_scroll()
 
+        # Statistics page (hidden by default)
+        self.statistics_frame = ctk.CTkScrollableFrame(
+            self.content_frame,
+            label_text="",
+            fg_color=gallery_bg
+        )
+        # Don't grid it yet - will be shown on toggle
+
         # Bottom bar - single rounded clean bar for gallery controls
         frame_colors = self.theme_manager.get_frame_colors()
         bottom_bar = ctk.CTkFrame(main_frame, fg_color=frame_colors.get(
@@ -564,7 +679,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             font=("Arial", 11),
             fg_color="transparent"
         )
-        # Don't grid it yet - will be shown when gallery is visible
+        # Don't grid it yet - will be shown when gallery is visible (column 1)
 
         # Filter button (hidden by default, shown when gallery is visible)
         self.filter_btn = ctk.CTkButton(
@@ -574,7 +689,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             command=self._cycle_filter,
             font=self.btn_font
         )
-        # Don't grid it yet - will be shown when gallery is visible
+        # Don't grid it yet - will be shown when gallery is visible (column 2)
 
         # Create a container frame for right-aligned buttons (Connect, Status LED, Theme)
         right_buttons_frame = ctk.CTkFrame(
@@ -1215,6 +1330,11 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             self.search_entry.grid_forget()
             self.filter_btn.grid_forget()
         else:
+            # Hide statistics if showing
+            if self.statistics_visible:
+                self.statistics_frame.grid_forget()
+                self.statistics_visible = False
+            
             # Show gallery
             self.drop_icon.grid_forget()
             self.drop_label.grid_forget()
@@ -1717,6 +1837,409 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
 
         except Exception as e:
             print(f"⚠️  Failed to show file details: {e}")
+
+    def _toggle_statistics(self):
+        """Toggle statistics page visibility"""
+        if self.statistics_visible:
+            # Hide statistics
+            self.statistics_frame.grid_forget()
+            self.drop_icon.grid()
+            self.drop_label.grid()
+            self.browse_btn.grid()
+            self.statistics_visible = False
+        else:
+            # Hide gallery and drop zone
+            if self.gallery_visible:
+                self.gallery_frame.grid_forget()
+                self.gallery_visible = False
+                self.gallery_btn.configure(text="Show Gallery")
+            
+            self.drop_icon.grid_forget()
+            self.drop_label.grid_forget()
+            self.browse_btn.grid_forget()
+            
+            # Show statistics
+            self.statistics_frame.grid(
+                row=3, column=0, sticky="nsew", padx=10, pady=10)
+            self.statistics_visible = True
+            
+            # Load statistics content
+            self._load_statistics_page()
+    
+    def _open_settings(self):
+        """Open the settings window"""
+        try:
+            # Check if settings window is already open
+            if hasattr(self, 'settings_window') and self.settings_window and self.settings_window.winfo_exists():
+                self.settings_window.focus()
+                return
+            
+            # Create new settings window
+            self.settings_window = SettingsWindow(self, self.version_manager, self.theme_manager)
+        except Exception as e:
+            print(f"⚠️  Failed to open settings: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _load_statistics_page(self):
+        """Load and display statistics in the main content area"""
+        try:
+            # Clear existing content
+            for widget in self.statistics_frame.winfo_children():
+                widget.destroy()
+
+            # Get history from file manager
+            history = self.file_manager.get_history()
+            
+            # Calculate statistics
+            total_transfers = len(history)
+            total_bytes = sum(item.get('size', 0) for item in history.values())
+            total_mb = total_bytes / (1024 * 1024)
+            total_gb = total_bytes / (1024 * 1024 * 1024)
+            
+            # Count by type (sent vs received)
+            sent_count = sum(1 for item in history.values() if item.get(
+                'sender') == self.my_profile_var.get())
+            received_count = total_transfers - sent_count
+            
+            # File format statistics
+            format_stats = {}
+            for item in history.values():
+                ext = item.get('extension', 'Unknown')
+                if ext not in format_stats:
+                    format_stats[ext] = 0
+                format_stats[ext] += 1
+            
+            # Per-user statistics
+            user_stats = {}
+            for item in history.values():
+                sender = item.get('sender', 'Unknown')
+                receiver = item.get('receiver', 'Unknown')
+                size = item.get('size', 0)
+                
+                # Track sent data
+                if sender not in user_stats:
+                    user_stats[sender] = {'sent': 0, 'received': 0, 'count': 0}
+                user_stats[sender]['sent'] += size
+                user_stats[sender]['count'] += 1
+                
+                # Track received data
+                if receiver not in user_stats:
+                    user_stats[receiver] = {'sent': 0, 'received': 0, 'count': 0}
+                user_stats[receiver]['received'] += size
+
+            # Compact mode - show pie chart
+            if self.is_compact_mode:
+                # Title
+                title = ctk.CTkLabel(
+                    self.statistics_frame,
+                    text="📊 File Types",
+                    font=("Arial", 18, "bold"),
+                    text_color=("gray10", "gray90")
+                )
+                title.pack(pady=(10, 15))
+
+                if format_stats:
+                    # Create pie chart using matplotlib
+                    try:
+                        import matplotlib
+                        matplotlib.use('Agg')  # Non-interactive backend
+                        import matplotlib.pyplot as plt
+                        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
+                        
+                        # Sort and get top 5 formats
+                        sorted_formats = sorted(format_stats.items(), key=lambda x: x[1], reverse=True)[:5]
+                        labels = [ext for ext, _ in sorted_formats]
+                        sizes = [count for _, count in sorted_formats]
+                        colors = ["#e74c3c", "#3498db", "#2ecc71", "#f39c12", "#9b59b6"]
+                        
+                        # Create figure with dark/light background based on theme
+                        is_dark = self.theme_manager.current_theme_name == "dark"
+                        fig_bg = "#2b2b2b" if is_dark else "#f0f0f0"
+                        text_color = "#e0e0e0" if is_dark else "#1a1a1a"
+                        
+                        fig, ax = plt.subplots(figsize=(5, 5), facecolor=fig_bg)
+                        ax.set_facecolor(fig_bg)
+                        
+                        # Create pie chart
+                        wedges, texts, autotexts = ax.pie(
+                            sizes, 
+                            labels=labels, 
+                            colors=colors,
+                            autopct='%1.0f%%',
+                            startangle=90,
+                            textprops={'color': text_color, 'fontsize': 11, 'weight': 'bold'}
+                        )
+                        
+                        # Equal aspect ratio ensures circular pie
+                        ax.axis('equal')
+                        
+                        # Embed in tkinter
+                        chart_container = ctk.CTkFrame(
+                            self.statistics_frame,
+                            fg_color=("gray90", "gray20"),
+                            corner_radius=12
+                        )
+                        chart_container.pack(pady=10, padx=15, fill="both", expand=True)
+                        
+                        canvas = FigureCanvasTkAgg(fig, master=chart_container)
+                        canvas.draw()
+                        canvas.get_tk_widget().pack(pady=10, padx=10, fill="both", expand=True)
+                        
+                        # Close the figure to free memory
+                        plt.close(fig)
+                        
+                    except ImportError:
+                        # Fallback to bar chart if matplotlib not available
+                        format_section = ctk.CTkFrame(
+                            self.statistics_frame,
+                            fg_color=("gray90", "gray20"),
+                            corner_radius=12
+                        )
+                        format_section.pack(pady=10, padx=15, fill="both", expand=True)
+                        
+                        sorted_formats = sorted(format_stats.items(), key=lambda x: x[1], reverse=True)[:5]
+                        chart_frame = ctk.CTkFrame(format_section, fg_color="transparent")
+                        chart_frame.pack(pady=15, padx=15, fill="both", expand=True)
+                        
+                        bar_colors = ["#e74c3c", "#3498db", "#2ecc71", "#f39c12", "#9b59b6"]
+                        max_count = max([count for _, count in sorted_formats]) if sorted_formats else 1
+                        
+                        for idx, (ext, count) in enumerate(sorted_formats):
+                            row_frame = ctk.CTkFrame(chart_frame, fg_color="transparent")
+                            row_frame.pack(fill="x", pady=6)
+                            
+                            ext_label = ctk.CTkLabel(
+                                row_frame,
+                                text=f"{ext}:",
+                                font=("Arial", 12, "bold"),
+                                width=60,
+                                anchor="w",
+                                text_color=("gray10", "gray90")
+                            )
+                            ext_label.pack(side="left", padx=(0, 8))
+                            
+                            bar_width = int((count / max_count) * 200)
+                            bar = ctk.CTkFrame(
+                                row_frame,
+                                width=bar_width,
+                                height=25,
+                                fg_color=bar_colors[idx % len(bar_colors)],
+                                corner_radius=5
+                            )
+                            bar.pack(side="left", padx=(0, 8))
+                            bar.pack_propagate(False)
+                            
+                            count_label = ctk.CTkLabel(
+                                bar,
+                                text=f"{count}",
+                                font=("Arial", 11, "bold"),
+                                text_color="white"
+                            )
+                            count_label.place(relx=0.5, rely=0.5, anchor="center")
+                else:
+                    # No data message
+                    no_data = ctk.CTkLabel(
+                        self.statistics_frame,
+                        text="No transfer data yet",
+                        font=("Arial", 14),
+                        text_color="gray"
+                    )
+                    no_data.pack(pady=40)
+                
+                return  # Exit early for compact mode
+
+            # Normal mode - full statistics view
+            # Title
+            title = ctk.CTkLabel(
+                self.statistics_frame,
+                text="Transfer Statistics",
+                font=("Arial", 28, "bold"),
+                text_color=("gray10", "gray90")
+            )
+            title.pack(pady=(20, 30))
+
+            # Top metrics row with colorful cards
+            metrics_row = ctk.CTkFrame(self.statistics_frame, fg_color="transparent")
+            metrics_row.pack(pady=10, padx=20, fill="x")
+            
+            # Configure columns for even distribution
+            for i in range(4):
+                metrics_row.grid_columnconfigure(i, weight=1)
+            
+            # Metric cards
+            metrics = [
+                ("Total Transfers", f"{total_transfers}", "#3498db"),  # Blue
+                ("Total Data", f"{total_gb:.2f} GB", "#2ecc71"),  # Green
+                ("Files Sent", f"{sent_count}", "#e74c3c"),  # Red
+                ("Files Received", f"{received_count}", "#f39c12"),  # Orange
+            ]
+            
+            for idx, (label, value, color) in enumerate(metrics):
+                card = ctk.CTkFrame(
+                    metrics_row,
+                    fg_color=color,
+                    corner_radius=12
+                )
+                card.grid(row=0, column=idx, padx=10, pady=5, sticky="ew")
+                
+                value_label = ctk.CTkLabel(
+                    card,
+                    text=value,
+                    font=("Arial", 32, "bold"),
+                    text_color="white"
+                )
+                value_label.pack(pady=(15, 5))
+                
+                name_label = ctk.CTkLabel(
+                    card,
+                    text=label,
+                    font=("Arial", 13),
+                    text_color="white"
+                )
+                name_label.pack(pady=(0, 15))
+
+            # File format pie chart section
+            if format_stats:
+                format_section = ctk.CTkFrame(
+                    self.statistics_frame,
+                    fg_color=("gray90", "gray20"),
+                    corner_radius=12
+                )
+                format_section.pack(pady=20, padx=20, fill="both")
+                
+                format_title = ctk.CTkLabel(
+                    format_section,
+                    text="📁 Most Sent File Formats",
+                    font=("Arial", 20, "bold"),
+                    text_color=("gray10", "gray90")
+                )
+                format_title.pack(pady=(15, 10))
+                
+                # Sort formats by count
+                sorted_formats = sorted(format_stats.items(), key=lambda x: x[1], reverse=True)[:6]
+                
+                # Create visual bar chart
+                chart_frame = ctk.CTkFrame(format_section, fg_color="transparent")
+                chart_frame.pack(pady=10, padx=30, fill="both", expand=True)
+                
+                # Colors for bars
+                bar_colors = ["#e74c3c", "#3498db", "#2ecc71", "#f39c12", "#9b59b6", "#1abc9c"]
+                
+                max_count = max([count for _, count in sorted_formats]) if sorted_formats else 1
+                
+                for idx, (ext, count) in enumerate(sorted_formats):
+                    row_frame = ctk.CTkFrame(chart_frame, fg_color="transparent")
+                    row_frame.pack(fill="x", pady=8)
+                    
+                    # Extension label
+                    ext_label = ctk.CTkLabel(
+                        row_frame,
+                        text=f"{ext}:",
+                        font=("Arial", 14, "bold"),
+                        width=80,
+                        anchor="w",
+                        text_color=("gray10", "gray90")
+                    )
+                    ext_label.pack(side="left", padx=(0, 10))
+                    
+                    # Progress bar as visual representation
+                    bar_width = int((count / max_count) * 400)
+                    bar = ctk.CTkFrame(
+                        row_frame,
+                        width=bar_width,
+                        height=30,
+                        fg_color=bar_colors[idx % len(bar_colors)],
+                        corner_radius=6
+                    )
+                    bar.pack(side="left", padx=(0, 10))
+                    bar.pack_propagate(False)
+                    
+                    # Count label on bar
+                    count_label = ctk.CTkLabel(
+                        bar,
+                        text=f"{count}",
+                        font=("Arial", 13, "bold"),
+                        text_color="white"
+                    )
+                    count_label.place(relx=0.5, rely=0.5, anchor="center")
+
+            # Per-user statistics section
+            if user_stats:
+                users_section = ctk.CTkFrame(
+                    self.statistics_frame,
+                    fg_color=("gray90", "gray20"),
+                    corner_radius=12
+                )
+                users_section.pack(pady=20, padx=20, fill="both")
+                
+                users_title = ctk.CTkLabel(
+                    users_section,
+                    text="👥 Per-User Statistics",
+                    font=("Arial", 20, "bold"),
+                    text_color=("gray10", "gray90")
+                )
+                users_title.pack(pady=(15, 10))
+
+                users_grid = ctk.CTkFrame(users_section, fg_color="transparent")
+                users_grid.pack(pady=10, padx=20, fill="both")
+
+                for idx, (user, stats) in enumerate(sorted(user_stats.items(), key=lambda x: x[1]['count'], reverse=True)):
+                    user_card = ctk.CTkFrame(
+                        users_grid,
+                        fg_color=("gray85", "gray25"),
+                        corner_radius=10
+                    )
+                    user_card.pack(pady=8, padx=10, fill="x")
+
+                    # User name with emoji
+                    user_label = ctk.CTkLabel(
+                        user_card,
+                        text=f"👤 {user}",
+                        font=("Arial", 16, "bold"),
+                        text_color=("gray10", "gray90")
+                    )
+                    user_label.pack(pady=(12, 8), padx=15, anchor="w")
+
+                    # Stats in columns
+                    stats_row = ctk.CTkFrame(user_card, fg_color="transparent")
+                    stats_row.pack(pady=(0, 12), padx=15, fill="x")
+                    
+                    sent_mb = stats['sent'] / (1024 * 1024)
+                    received_mb = stats['received'] / (1024 * 1024)
+                    
+                    # Transfers count
+                    transfers_frame = ctk.CTkFrame(stats_row, fg_color="#3498db", corner_radius=8)
+                    transfers_frame.pack(side="left", padx=(0, 10), ipadx=15, ipady=8)
+                    ctk.CTkLabel(
+                        transfers_frame,
+                        text=f"📊 {stats['count']} transfers",
+                        font=("Arial", 12, "bold"),
+                        text_color="white"
+                    ).pack()
+                    
+                    # Sent data
+                    sent_frame = ctk.CTkFrame(stats_row, fg_color="#e74c3c", corner_radius=8)
+                    sent_frame.pack(side="left", padx=(0, 10), ipadx=15, ipady=8)
+                    ctk.CTkLabel(
+                        sent_frame,
+                        text=f"� Sent: {sent_mb:.1f} MB",
+                        font=("Arial", 12, "bold"),
+                        text_color="white"
+                    ).pack()
+                    
+                    # Received data
+                    received_frame = ctk.CTkFrame(stats_row, fg_color="#2ecc71", corner_radius=8)
+                    received_frame.pack(side="left", padx=(0, 10), ipadx=15, ipady=8)
+                    ctk.CTkLabel(
+                        received_frame,
+                        text=f"📥 Received: {received_mb:.1f} MB",
+                        font=("Arial", 12, "bold"),
+                        text_color="white"
+                    ).pack()
+
+        except Exception as e:
+            print(f"⚠️  Failed to load statistics: {e}")
 
     def _remove_file(self, file_path):
         """Remove a file from the gallery"""
