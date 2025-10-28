@@ -47,7 +47,7 @@ class ThemeManager:
     # Light Theme - Clean white/off-white with vibrant blue accent
     LIGHT_THEME = ThemeColors(
         # Backgrounds
-        bg_primary="#FAFAFA",      # Off-white main background
+        bg_primary="#FFFFFF",      # Pure white main background
         bg_secondary="#FFFFFF",     # Pure white for cards/panels
         bg_tertiary="#F5F5F5",      # Subtle gray for sections
 
@@ -78,8 +78,8 @@ class ThemeManager:
     # Dark Theme - Deep charcoal with luminous blue accent
     DARK_THEME = ThemeColors(
         # Backgrounds
-        bg_primary="#1E1E1E",       # Deep charcoal main background
-        bg_secondary="#2C2C2C",     # Slightly lighter for cards
+        bg_primary="#121212",       # Deep charcoal main background
+        bg_secondary="#2B2B2B",     # Slightly lighter for cards/top bar
         bg_tertiary="#252525",      # Between primary and secondary
 
         # Text

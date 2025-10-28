@@ -4,6 +4,7 @@ Main window for SyncStream application
 
 import customtkinter as ctk
 from pathlib import Path
+import tkinter as tk
 from PIL import Image
 import json
 import os
@@ -69,21 +70,22 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         # Set theme to green and appearance mode
         ctk.set_default_color_theme("green")
         ctk.set_appearance_mode(self.theme_manager.get_ctk_theme_mode())
-
-        # Fix theme background by setting background color to match CTk container
-        if DRAG_DROP_AVAILABLE:
-            # For TkinterDnD.Tk, set the background color to match the container frame
-            if self.theme_manager.current_theme_name == "dark":
-                # gray14 - matches dark theme container
-                self.configure(bg="#242424")
-            else:
-                # gray92 - matches light theme container
-                self.configure(bg="#ebebeb")
-
-        # Set window icon based on theme (BLACK icon for dark mode, WHITE icon for light mode)
+        # Fix theme background by setting background color to match ThemeManager
         try:
-            icon_name = "blackp2p.ico" if self.theme_manager.current_theme_name == "dark" else "whitep2p.ico"
-            icon_path = self.assets_path / icon_name
+            theme_bg = self.theme_manager.current_theme.bg_primary
+            # Ensure window background matches theme primary background
+            self.configure(bg=theme_bg)
+        except Exception:
+            # Fallback to previous handling for TkinterDnD
+            if DRAG_DROP_AVAILABLE:
+                if self.theme_manager.current_theme_name == "dark":
+                    self.configure(bg="#242424")
+                else:
+                    self.configure(bg="#ebebeb")
+
+        # Use a single app icon (blackp2p.ico) regardless of theme
+        try:
+            icon_path = self.assets_path / "blackp2p.ico"
             if icon_path.exists():
                 self.iconbitmap(str(icon_path))
             else:
@@ -116,6 +118,10 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         # Initialize shared files list and load from disk
         self.shared_files = []
         self._load_shared_files()
+
+        # Standard button style to use across the UI (keep consistent)
+        self.btn_width = 90
+        self.btn_font = ("Arial", 14, "bold")
 
         # Track active transfers
         self.active_transfers = {}
@@ -233,10 +239,31 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
 
     def _build_ui(self):
         """Build the main UI"""
-        # Create a container frame that covers the entire window
-        # This ensures consistent background in drag-drop mode
-        container = ctk.CTkFrame(self, fg_color=(
-            "gray92", "gray14"), corner_radius=0)
+        # Create a container frame with theme background so the app matches theme
+        try:
+            # Prefer ThemeManager's primary bg when available
+            theme_bg = self.theme_manager.current_theme.bg_primary
+            # If ThemeManager exposes a name, use it to enforce light-mode white
+            tm_name = getattr(self.theme_manager, 'current_theme_name', None)
+            if tm_name and str(tm_name).lower().startswith('light'):
+                # Ensure light mode background is white (avoid stray dark defaults)
+                theme_bg = '#ffffff'
+        except Exception:
+            theme_bg = None
+        # Fallback to CTk appearance mode if ThemeManager did not provide info
+        if not theme_bg:
+            try:
+                app_mode = ctk.get_appearance_mode()
+                if app_mode and str(app_mode).lower().startswith('light'):
+                    theme_bg = '#ffffff'
+                else:
+                    theme_bg = '#121212'
+            except Exception:
+                theme_bg = '#121212'
+
+        # Use the theme primary background for the main container so "transparent"
+        # child frames render over the correct background instead of CTk's default
+        container = ctk.CTkFrame(self, fg_color=theme_bg, corner_radius=0)
         container.grid(row=0, column=0, sticky="nsew", padx=0, pady=0)
 
         # Configure window grid
@@ -254,21 +281,40 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
 
     def _build_top_bar(self, parent):
         """Build the top bar with profiles and connection"""
-        top_frame = ctk.CTkFrame(parent, fg_color="transparent")
-        top_frame.grid(row=0, column=0, sticky="ew", padx=10, pady=10)
+        # Theme-aware top bar frame - use corner_radius=0 and we'll add rounded bottom corners
+        frame_colors = self.theme_manager.get_frame_colors()
+        top_fg = frame_colors.get("fg_color", None)
+        top_border = frame_colors.get("border_color", None)
 
-        # Configure columns - add weight to push right elements to the right
-        top_frame.grid_columnconfigure(0, weight=0)  # My Profile label
-        top_frame.grid_columnconfigure(1, weight=0)  # My Profile selector
-        top_frame.grid_columnconfigure(2, weight=0)  # Pipe
-        top_frame.grid_columnconfigure(3, weight=0)  # Connect to label
-        top_frame.grid_columnconfigure(4, weight=1)  # Peer selector - expands
-        top_frame.grid_columnconfigure(5, weight=0)  # Connect button
-        top_frame.grid_columnconfigure(6, weight=0)  # LED
+        # Container frame with no rounded corners (straight on top)
+        top_frame = ctk.CTkFrame(
+            parent, fg_color=top_fg, border_color=top_border, border_width=1, corner_radius=0)
+        # store reference for later theme updates
+        self.top_frame = top_frame
+        # Touch edges horizontally (no horizontal padding), small vertical gap below
+        top_frame.grid(row=0, column=0, sticky="ew", padx=0, pady=(0, 8))
+
+        # Add a rounded overlay frame at the bottom to create bottom-rounded effect
+        bottom_rounded = ctk.CTkFrame(
+            top_frame, fg_color=top_fg, corner_radius=12, height=24)
+        bottom_rounded.place(relx=0, rely=1.0, anchor="sw", relwidth=1.0)
+        self.top_frame_rounded_bottom = bottom_rounded
+
+        # Create an inner content frame so the bar can touch window edges while
+        # the inner controls have comfortable padding from the sides.
+        inner_top = ctk.CTkFrame(top_frame, fg_color="transparent")
+        inner_top.grid(row=0, column=0, sticky="nsew", padx=12, pady=8)
+
+        # Configure columns on inner frame - push right elements to the right
+        inner_top.grid_columnconfigure(0, weight=0)  # My Profile label
+        inner_top.grid_columnconfigure(1, weight=0)  # My Profile selector
+        inner_top.grid_columnconfigure(2, weight=0)  # Pipe
+        inner_top.grid_columnconfigure(3, weight=0)  # Connect to label
+        inner_top.grid_columnconfigure(4, weight=1)  # Peer selector - expands
 
         # My Profile label
         my_profile_label = ctk.CTkLabel(
-            top_frame,
+            inner_top,
             text="My Profile:",
             font=("Arial", 13, "bold")
         )
@@ -282,11 +328,11 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         self.my_profile_var = ctk.StringVar(
             value=profile_names[0] if profile_names else "")
         self.my_profile_selector = ctk.CTkOptionMenu(
-            top_frame,
+            inner_top,
             variable=self.my_profile_var,
             values=profile_names if profile_names else ["No profiles"],
-            width=my_profile_width,
-            font=("Arial", 12),
+            width=self.btn_width,
+            font=self.btn_font,
             dynamic_resizing=False
         )
         self.my_profile_selector.grid(
@@ -294,7 +340,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
 
         # Pipe separator
         pipe_label = ctk.CTkLabel(
-            top_frame,
+            inner_top,
             text="|",
             font=("Arial", 16, "bold")
         )
@@ -302,7 +348,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
 
         # Connect to label
         connect_label = ctk.CTkLabel(
-            top_frame,
+            inner_top,
             text="Connect to:",
             font=("Arial", 13, "bold")
         )
@@ -315,47 +361,75 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         self.peer_profile_var = ctk.StringVar(value=profile_names[1] if len(
             profile_names) > 1 else (profile_names[0] if profile_names else ""))
         self.peer_profile_selector = ctk.CTkOptionMenu(
-            top_frame,
+            inner_top,
             variable=self.peer_profile_var,
             values=profile_names if profile_names else ["No profiles"],
-            width=peer_profile_width,
-            font=("Arial", 12),
+            width=self.btn_width,
+            font=self.btn_font,
             dynamic_resizing=False
         )
         self.peer_profile_selector.grid(
             row=0, column=4, padx=(0, 10), sticky="w")
 
-        # Connect button
-        self.connect_btn = ctk.CTkButton(
-            top_frame,
-            text="Connect",
-            command=self._toggle_connection,
-            width=100,
-            font=("Arial", 12, "bold")
-        )
-        self.connect_btn.grid(row=0, column=5, padx=(0, 10), sticky="e")
+        # Note: Connect button and status indicator live in the bottom bar now
+        # (bottom bar holds the actionable controls). We intentionally do not
+        # create connect/status widgets in the top bar so the top remains a
+        # clean, informational bar.
+        # Apply initial theme to top/bottom bars
+        try:
+            self._update_top_bar_theme()
+        except Exception:
+            pass
 
-        # Status LED
-        self.status_led = ctk.CTkLabel(
-            top_frame,
-            text="●",
-            font=("Arial", 20),
-            text_color="red"  # Default to red when not connected
-        )
-        self.status_led.grid(row=0, column=6, sticky="e")
+    def _update_top_bar_theme(self):
+        """Apply current theme colors to the top bar and bottom bar."""
+        try:
+            frame_colors = self.theme_manager.get_frame_colors()
+            top_fg = frame_colors.get("fg_color", None)
+            top_border = frame_colors.get("border_color", None)
+            if hasattr(self, 'top_frame') and self.top_frame:
+                self.top_frame.configure(
+                    fg_color=top_fg, border_color=top_border)
+
+            # Update the rounded bottom overlay too
+            if hasattr(self, 'top_frame_rounded_bottom') and self.top_frame_rounded_bottom:
+                self.top_frame_rounded_bottom.configure(fg_color=top_fg)
+
+            # bottom bar too
+            if hasattr(self, 'bottom_bar') and self.bottom_bar:
+                self.bottom_bar.configure(
+                    fg_color=top_fg, border_color=top_border)
+        except Exception as e:
+            print(f"⚠️  Failed to update top/bottom bar theme: {e}")
 
     def _build_main_content(self, parent):
         """Build the main content area"""
-        main_frame = ctk.CTkFrame(parent)
+        # Determine theme background for content area (fallback if needed)
+        try:
+            theme_bg = self.theme_manager.current_theme.bg_primary
+        except Exception:
+            theme_bg = None
+        if not theme_bg:
+            try:
+                mode = self.theme_manager.current_theme_name
+            except Exception:
+                mode = 'dark'
+            theme_bg = '#ffffff' if mode == 'light' else '#121212'
+
+        main_frame = ctk.CTkFrame(parent, fg_color=theme_bg)
         main_frame.grid(row=1, column=0, sticky="nsew", padx=10, pady=(0, 10))
+
+        # Store reference for theme updates
+        self.main_frame = main_frame
 
         # Configure grid
         main_frame.grid_columnconfigure(0, weight=1)
         main_frame.grid_rowconfigure(0, weight=1)
         main_frame.grid_rowconfigure(1, weight=0)
 
-        # Content frame (drag & drop area)
-        self.content_frame = ctk.CTkFrame(main_frame)
+        # Content frame (drag & drop area) - use theme background so transparent
+        # children show the theme correctly (prevents fallback to hard-coded dark)
+        self.content_frame = ctk.CTkFrame(main_frame, fg_color=theme_bg)
         self.content_frame.grid(
             row=0, column=0, sticky="nsew", padx=10, pady=10)
 
@@ -415,8 +489,8 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             self.content_frame,
             text="Browse Files",
             command=self._browse_files,
-            width=150,
-            font=("Arial", 12, "bold")
+            width=self.btn_width,
+            font=self.btn_font
         )
         self.browse_btn.grid(row=2, column=0, pady=(5, 40))
 
@@ -433,34 +507,47 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         for i in range(4):
             self.gallery_frame.grid_columnconfigure(i, weight=1)
 
-        # Bottom bar
-        bottom_bar = ctk.CTkFrame(main_frame)
-        bottom_bar.grid(row=1, column=0, sticky="ew", padx=10, pady=(0, 10))
+        # Bottom bar - single rounded clean bar for gallery controls
+        frame_colors = self.theme_manager.get_frame_colors()
+        bottom_bar = ctk.CTkFrame(main_frame, fg_color=frame_colors.get(
+            "fg_color"), corner_radius=12, border_width=1, border_color=frame_colors.get("border_color"))
+        # Touch edges horizontally so the bar spans the full window width
+        bottom_bar.grid(row=1, column=0, sticky="ew", padx=0, pady=(0, 0))
 
-        bottom_bar.grid_columnconfigure(0, weight=0)  # Gallery toggle button
-        bottom_bar.grid_columnconfigure(1, weight=0)  # Search box
-        bottom_bar.grid_columnconfigure(2, weight=0)  # Filter button
-        bottom_bar.grid_columnconfigure(3, weight=1)  # Spacer
-        bottom_bar.grid_columnconfigure(4, weight=0)  # Theme button
+        # Inner padded area inside the bottom bar so controls don't touch edges
+        inner_bottom = ctk.CTkFrame(bottom_bar, fg_color="transparent")
+        inner_bottom.grid(row=0, column=0, sticky="nsew", padx=12, pady=8)
+        # Define a consistent button style to match the Show Gallery button
+        # Store on self so other methods (gallery loader) can reuse the same style
+        self.btn_width = 90
+        self.btn_font = ("Arial", 14, "bold")
+
+        # Configure grid columns: left buttons, spacer, right buttons
+        inner_bottom.grid_columnconfigure(0, weight=0)  # Show Gallery
+        inner_bottom.grid_columnconfigure(1, weight=0)  # Search (when visible)
+        inner_bottom.grid_columnconfigure(2, weight=0)  # Filter (when visible)
+        # Spacer - expands to push right buttons
+        inner_bottom.grid_columnconfigure(3, weight=1)
+        inner_bottom.grid_columnconfigure(4, weight=0)  # Right group container
 
         # Store bottom_bar reference for later use
         self.bottom_bar = bottom_bar
 
-        # Gallery toggle button
+        # Gallery toggle button (left side)
         self.gallery_btn = ctk.CTkButton(
-            bottom_bar,
+            inner_bottom,
             text="Show Gallery",
-            width=120,
+            width=self.btn_width,
             command=self._toggle_gallery,
-            font=("Arial", 11, "bold")
+            font=self.btn_font
         )
-        self.gallery_btn.grid(row=0, column=0, padx=5, pady=5)
+        self.gallery_btn.grid(row=0, column=0, padx=(0, 8), pady=0, sticky="w")
 
         # Search box (hidden by default, shown when gallery is visible)
         self.search_var = ctk.StringVar()
         self.search_var.trace("w", lambda *args: self._filter_gallery())
         self.search_entry = ctk.CTkEntry(
-            bottom_bar,
+            inner_bottom,
             placeholder_text="Search files...",
             width=200,
             textvariable=self.search_var,
@@ -470,15 +557,25 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
 
         # Filter button (hidden by default, shown when gallery is visible)
         self.filter_btn = ctk.CTkButton(
-            bottom_bar,
+            inner_bottom,
             text="Filter: All",
-            width=100,
+            width=self.btn_width,
             command=self._cycle_filter,
-            font=("Arial", 11, "bold")
+            font=self.btn_font
         )
         # Don't grid it yet - will be shown when gallery is visible
 
-        # Theme toggle button
+        # Theme toggle button (kept on bottom bar)
+        # Create a container frame for right-aligned buttons first
+        right_buttons_frame = ctk.CTkFrame(
+            inner_bottom, fg_color="transparent")
+        right_buttons_frame.grid(row=0, column=4, sticky="e")
+
+        # Configure right buttons frame columns
+        right_buttons_frame.grid_columnconfigure(0, weight=0)  # Connect
+        right_buttons_frame.grid_columnconfigure(1, weight=0)  # Status
+        right_buttons_frame.grid_columnconfigure(2, weight=0)  # Theme
+
         try:
             icon_name = "sun.png" if self.theme_manager.current_theme_name == "dark" else "moon.png"
             icon_path = Path(__file__).parent.parent.parent / \
@@ -490,12 +587,13 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                     dark_image=Image.open(icon_path),
                     size=(24, 24)
                 )
+                # Keep theme toggle but match button sizing/style
                 self.theme_btn = ctk.CTkButton(
-                    bottom_bar,
+                    right_buttons_frame,
                     text="",
                     image=icon_image,
                     command=self._toggle_theme,
-                    width=50,
+                    width=self.btn_width,
                     height=40,
                     fg_color="transparent",
                     hover_color=("gray85", "gray25")
@@ -503,29 +601,49 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             else:
                 theme_icon = "☀️" if self.theme_manager.current_theme_name == "dark" else "🌙"
                 self.theme_btn = ctk.CTkButton(
-                    bottom_bar,
+                    right_buttons_frame,
                     text=theme_icon,
                     command=self._toggle_theme,
-                    width=50,
+                    width=self.btn_width,
                     height=40,
-                    font=("Arial", 18),
+                    font=self.btn_font,
                     fg_color="transparent",
                     hover_color=("gray85", "gray25")
                 )
         except Exception as e:
             theme_icon = "☀️" if self.theme_manager.current_theme_name == "dark" else "🌙"
             self.theme_btn = ctk.CTkButton(
-                bottom_bar,
+                right_buttons_frame,
                 text=theme_icon,
                 command=self._toggle_theme,
-                width=50,
+                width=self.btn_width,
                 height=40,
-                font=("Arial", 18),
+                font=self.btn_font,
                 fg_color="transparent",
                 hover_color=("gray85", "gray25")
             )
 
-        self.theme_btn.grid(row=0, column=4, padx=5, pady=5)
+        # Connect button
+        self.connect_btn = ctk.CTkButton(
+            right_buttons_frame,
+            text="Connect",
+            command=self._toggle_connection,
+            width=self.btn_width,
+            font=self.btn_font
+        )
+        self.connect_btn.grid(row=0, column=0, padx=(0, 4))
+
+        # Status LED
+        self.status_led = ctk.CTkLabel(
+            right_buttons_frame,
+            text="●",
+            font=("Arial", 18),
+            text_color="red"
+        )
+        self.status_led.grid(row=0, column=1, padx=(0, 4))
+
+        # Theme toggle (already created above)
+        self.theme_btn.grid(row=0, column=2, padx=(0, 0))
 
         # Load file gallery
         self._load_file_gallery()
@@ -927,38 +1045,53 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
 
             file_name = Path(file_path).name
 
-            # Clean container with better styling - thinner borders visible in both themes
+            # Clean container with subtler styling - remove heavy border and use a minimal look
             file_frame = ctk.CTkFrame(
                 self.gallery_frame,
                 corner_radius=10,
-                border_width=1,
-                border_color=("gray70", "gray40")
+                border_width=0,
+                fg_color="transparent"
             )
             file_frame.grid(row=row, column=col, padx=8, pady=8, sticky="nsew")
+            # Fix size so all items have equal dimensions
+            try:
+                file_frame.configure(width=160, height=160)
+                file_frame.grid_propagate(False)
+            except Exception:
+                pass
 
             # Generate thumbnail or use icon
             thumbnail = self._get_file_thumbnail(file_path)
 
+            # Icon container - fixed size so thumbnails and emojis align
+            icon_container = ctk.CTkFrame(
+                file_frame, fg_color="transparent", width=120, height=90)
+            icon_container.pack(pady=(10, 5))
+            try:
+                icon_container.pack_propagate(False)
+            except Exception:
+                pass
+
             if thumbnail:
                 # Use thumbnail image with transparent background
                 file_icon = ctk.CTkLabel(
-                    file_frame,
+                    icon_container,
                     image=thumbnail,
                     text="",
                     fg_color="transparent"
                 )
                 file_icon.image = thumbnail  # Keep reference
             else:
-                # Use emoji icon based on file type
+                # Use emoji icon based on file type (scale up to container)
                 icon_emoji = self._get_file_icon(file_path)
                 file_icon = ctk.CTkLabel(
-                    file_frame,
+                    icon_container,
                     text=icon_emoji,
-                    font=("Arial", 32),
+                    font=("Arial", 40),
                     fg_color="transparent"
                 )
 
-            file_icon.pack(pady=(10, 5))
+            file_icon.pack(expand=True)
 
             # File name
             name_label = ctk.CTkLabel(
@@ -996,10 +1129,10 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             open_btn = ctk.CTkButton(
                 btn_container,
                 text="Open",
-                width=70,
-                height=28,
+                width=self.btn_width,
+                height=34,
                 command=lambda fp=file_path: self._open_file(fp),
-                font=("Arial", 11, "bold"),
+                font=self.btn_font,
                 fg_color="#28a745",  # Lighter green
                 hover_color="#218838"  # Medium green
             )
@@ -1010,27 +1143,31 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 send_btn = ctk.CTkButton(
                     btn_container,
                     text="📤",
-                    width=35,
-                    height=28,
+                    width=self.btn_width,
+                    height=34,
                     command=lambda fp=file_path: self._send_file(fp),
-                    font=("Arial", 13),
+                    font=self.btn_font,
                     fg_color="#28a745",  # Lighter green
                     hover_color="#218838"  # Medium green
                 )
                 send_btn.pack(side="left", padx=3)
 
-            # Remove button
+            # Transparent top-right remove "X" button (no background)
             remove_btn = ctk.CTkButton(
-                btn_container,
-                text="×",
-                width=35,
+                file_frame,
+                text="✕",
+                width=28,
                 height=28,
                 command=lambda fp=file_path: self._remove_file(fp),
-                font=("Arial", 16, "bold"),
-                fg_color="red",
-                hover_color="darkred"
+                font=("Arial", 12, "bold"),
+                fg_color="transparent",
+                hover_color=("#f0f0f0", "#2a2a2a"),
+                text_color=("#b00020", "#ff6b6b"),
+                corner_radius=14,
+                border_width=0
             )
-            remove_btn.pack(side="left", padx=3)
+            # place in top-right corner of the item
+            remove_btn.place(relx=1.0, x=-8, y=8, anchor='ne')
 
             # Right-click context menu
             file_frame.bind("<Button-3>", lambda e,
@@ -1048,7 +1185,6 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 "progress": progress_bar,
                 "status": status_label,
                 "btn_container": btn_container,
-                "remove_btn": remove_btn
             }
 
     def _get_file_thumbnail(self, file_path):
@@ -1209,11 +1345,13 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             dialog.transient(self)
             dialog.grab_set()
 
-            # Set icon based on theme (BLACK for dark, WHITE for light)
-            icon_name = "blackp2p.ico" if ctk.get_appearance_mode() == "Dark" else "whitep2p.ico"
-            icon_path = self.assets_path / icon_name
-            if icon_path.exists():
-                dialog.iconbitmap(str(icon_path))
+            # Use the standard app icon for dialogs as well
+            try:
+                icon_path = self.assets_path / "blackp2p.ico"
+                if icon_path.exists():
+                    dialog.iconbitmap(str(icon_path))
+            except Exception:
+                pass
 
             # Title
             title = ctk.CTkLabel(
@@ -1265,14 +1403,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 )
                 value_widget.pack(side="left", fill="x", expand=True)
 
-            # Close button
-            close_btn = ctk.CTkButton(
-                dialog,
-                text="Close",
-                command=dialog.destroy,
-                width=100
-            )
-            close_btn.pack(pady=20)
+            # (Removed explicit Close button - user can close dialog via window chrome)
 
         except Exception as e:
             print(f"⚠️  Failed to show file details: {e}")
@@ -1491,11 +1622,9 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         self.theme_manager.toggle_theme()
         ctk.set_appearance_mode(self.theme_manager.get_ctk_theme_mode())
 
-        # Update window icon based on theme
+        # Keep the app icon static (blackp2p.ico) regardless of theme
         try:
-            icon_name = "whitep2p.ico" if self.theme_manager.current_theme_name == "dark" else "blackp2p.ico"
-            icon_path = Path(__file__).parent.parent.parent / \
-                "Assets" / icon_name
+            icon_path = self.assets_path / "blackp2p.ico"
             if icon_path.exists():
                 self.iconbitmap(str(icon_path))
         except Exception as e:
@@ -1538,7 +1667,33 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         except Exception as e:
             print(f"⚠️  Failed to update upload icon: {e}")
 
-        # Fade in effect
+        # Update top/bottom bar colors
+        try:
+            self._update_top_bar_theme()
+        except Exception as e:
+            print(f"⚠️  Failed to update top bar theme on toggle: {e}")
+
+        # Update root window and container backgrounds to match new theme
+        try:
+            # Get the proper theme background from ThemeManager
+            new_bg = self.theme_manager.current_theme.bg_primary
+
+            # Update root window background
+            self.configure(bg=new_bg)
+
+            # Update main_frame and content_frame backgrounds
+            if hasattr(self, 'main_frame'):
+                self.main_frame.configure(fg_color=new_bg)
+            if hasattr(self, 'content_frame'):
+                self.content_frame.configure(fg_color=new_bg)
+
+            # Update container (root container frame)
+            for widget in self.winfo_children():
+                if isinstance(widget, ctk.CTkFrame):
+                    widget.configure(fg_color=new_bg)
+        except Exception as e:
+            # Fade in effect
+            print(f"⚠️  Failed to update background on theme toggle: {e}")
         for i in range(1, steps + 1):
             alpha = i / steps
             try:
