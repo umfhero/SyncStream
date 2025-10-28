@@ -10,10 +10,10 @@ import json
 import os
 import sys
 from typing import Optional
+import webbrowser
 
 # Import version manager
 from utils.version_manager import VersionManager
-from ui.settings_window import SettingsWindow
 
 try:
     from tkinterdnd2 import DND_FILES, TkinterDnD
@@ -80,6 +80,11 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         # Fix theme background by setting background color to match ThemeManager
         try:
             theme_bg = self.theme_manager.current_theme.bg_primary
+            # If ThemeManager exposes a name, use it to enforce light-mode white
+            tm_name = getattr(self.theme_manager, 'current_theme_name', None)
+            if tm_name and str(tm_name).lower().startswith('light'):
+                # Ensure light mode background is white
+                theme_bg = '#ffffff'
             # Ensure window background matches theme primary background
             self.configure(bg=theme_bg)
         except Exception:
@@ -88,7 +93,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 if self.theme_manager.current_theme_name == "dark":
                     self.configure(bg="#242424")
                 else:
-                    self.configure(bg="#ebebeb")
+                    self.configure(bg="#ffffff")
 
         # Use a single app icon (blackp2p.ico) regardless of theme
         try:
@@ -143,6 +148,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         # Track view states
         self.gallery_visible = False
         self.statistics_visible = False
+        self.settings_visible = False
 
         # Save files on close
         self.protocol("WM_DELETE_WINDOW", self._on_window_close)
@@ -517,6 +523,11 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         # Determine theme background for content area (fallback if needed)
         try:
             theme_bg = self.theme_manager.current_theme.bg_primary
+            # If ThemeManager exposes a name, use it to enforce light-mode white
+            tm_name = getattr(self.theme_manager, 'current_theme_name', None)
+            if tm_name and str(tm_name).lower().startswith('light'):
+                # Ensure light mode background is white
+                theme_bg = '#ffffff'
         except Exception:
             theme_bg = None
         if not theme_bg:
@@ -607,7 +618,26 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         # File gallery (hidden by default)
         self.gallery_visible = False
         self.current_filter = "All"  # All, Images, Documents, Videos, Archives
-        gallery_bg = self.theme_manager.current_theme.bg_primary
+        
+        # Get proper theme background color
+        try:
+            gallery_bg = self.theme_manager.current_theme.bg_primary
+            # If ThemeManager exposes a name, use it to enforce light-mode white
+            tm_name = getattr(self.theme_manager, 'current_theme_name', None)
+            if tm_name and str(tm_name).lower().startswith('light'):
+                # Ensure light mode background is white
+                gallery_bg = '#ffffff'
+        except Exception:
+            # Fallback to CTk appearance mode
+            try:
+                app_mode = ctk.get_appearance_mode()
+                if app_mode and str(app_mode).lower().startswith('light'):
+                    gallery_bg = '#ffffff'
+                else:
+                    gallery_bg = self.theme_manager.current_theme.bg_primary
+            except Exception:
+                gallery_bg = self.theme_manager.current_theme.bg_primary
+        
         self.gallery_frame = ctk.CTkScrollableFrame(
             self.content_frame,
             label_text="",
@@ -626,7 +656,23 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         self.statistics_frame = ctk.CTkScrollableFrame(
             self.content_frame,
             label_text="",
-            fg_color=gallery_bg
+            fg_color="transparent",
+            scrollbar_fg_color="transparent",
+            scrollbar_button_color=("gray70", "gray30"),
+            corner_radius=0,
+            border_width=0
+        )
+        # Don't grid it yet - will be shown on toggle
+        
+        # Settings page (hidden by default)
+        self.settings_frame = ctk.CTkScrollableFrame(
+            self.content_frame,
+            label_text="",
+            fg_color="transparent",
+            scrollbar_fg_color="transparent",
+            scrollbar_button_color=("gray70", "gray30"),
+            corner_radius=0,
+            border_width=0
         )
         # Don't grid it yet - will be shown on toggle
 
@@ -1335,6 +1381,11 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 self.statistics_frame.grid_forget()
                 self.statistics_visible = False
             
+            # Hide settings if showing
+            if self.settings_visible:
+                self.settings_frame.grid_forget()
+                self.settings_visible = False
+            
             # Show gallery
             self.drop_icon.grid_forget()
             self.drop_label.grid_forget()
@@ -1848,12 +1899,21 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             self.browse_btn.grid()
             self.statistics_visible = False
         else:
-            # Hide gallery and drop zone
+            # Hide gallery if showing
             if self.gallery_visible:
                 self.gallery_frame.grid_forget()
                 self.gallery_visible = False
                 self.gallery_btn.configure(text="Show Gallery")
+                # Hide search and filter
+                self.search_entry.grid_forget()
+                self.filter_btn.grid_forget()
             
+            # Hide settings if showing
+            if self.settings_visible:
+                self.settings_frame.grid_forget()
+                self.settings_visible = False
+            
+            # Hide drop zone
             self.drop_icon.grid_forget()
             self.drop_label.grid_forget()
             self.browse_btn.grid_forget()
@@ -1867,19 +1927,371 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             self._load_statistics_page()
     
     def _open_settings(self):
-        """Open the settings window"""
-        try:
-            # Check if settings window is already open
-            if hasattr(self, 'settings_window') and self.settings_window and self.settings_window.winfo_exists():
-                self.settings_window.focus()
-                return
+        """Toggle settings page visibility"""
+        if self.settings_visible:
+            # Hide settings
+            self.settings_frame.grid_forget()
+            self.drop_icon.grid()
+            self.drop_label.grid()
+            self.browse_btn.grid()
+            self.settings_visible = False
+        else:
+            # Hide gallery if showing
+            if self.gallery_visible:
+                self.gallery_frame.grid_forget()
+                self.gallery_visible = False
+                self.gallery_btn.configure(text="Show Gallery")
+                # Hide search and filter
+                self.search_entry.grid_forget()
+                self.filter_btn.grid_forget()
             
-            # Create new settings window
-            self.settings_window = SettingsWindow(self, self.version_manager, self.theme_manager)
+            # Hide statistics if showing
+            if self.statistics_visible:
+                self.statistics_frame.grid_forget()
+                self.statistics_visible = False
+            
+            # Hide drop zone
+            self.drop_icon.grid_forget()
+            self.drop_label.grid_forget()
+            self.browse_btn.grid_forget()
+            
+            # Show settings
+            self.settings_frame.grid(
+                row=3, column=0, sticky="nsew", padx=10, pady=10)
+            self.settings_visible = True
+            
+            # Load settings content
+            self._load_settings_page()
+
+    def _load_settings_page(self):
+        """Load and display settings in the main content area"""
+        try:
+            # Clear existing content
+            for widget in self.settings_frame.winfo_children():
+                widget.destroy()
+
+            # Main container with padding
+            container = ctk.CTkFrame(self.settings_frame, fg_color="transparent")
+            container.pack(fill="both", expand=True, padx=20, pady=20)
+            
+            # Title
+            title_label = ctk.CTkLabel(
+                container,
+                text="Settings",
+                font=("Arial", 32, "bold")
+            )
+            title_label.pack(pady=(0, 30))
+            
+            # Grid container - 2 columns, 2 rows
+            grid_container = ctk.CTkFrame(container, fg_color="transparent")
+            grid_container.pack(fill="both", expand=True)
+            
+            # Configure grid weights
+            grid_container.grid_columnconfigure(0, weight=1)  # Left column
+            grid_container.grid_columnconfigure(1, weight=1)  # Right column
+            grid_container.grid_rowconfigure(0, weight=1)     # Top row
+            grid_container.grid_rowconfigure(1, weight=1)     # Bottom row
+            
+            # ============================================================
+            # TOP LEFT: Version Info (Row 0, Column 0)
+            # ============================================================
+            version_container = ctk.CTkFrame(grid_container, fg_color="transparent")
+            version_container.grid(row=0, column=0, sticky="nsew", padx=(0, 10), pady=(0, 10))
+            
+            # App Version
+            version_label = ctk.CTkLabel(
+                version_container,
+                text="Current Version:",
+                font=("Arial", 16, "bold")
+            )
+            version_label.pack(anchor="w", pady=(0, 8))
+            
+            version_value = ctk.CTkLabel(
+                version_container,
+                text=f"v{self.version_manager.get_current_version()}",
+                font=("Arial", 24),
+                text_color=("green", "lightgreen")
+            )
+            version_value.pack(anchor="w", pady=(0, 20))
+            
+            # Repository
+            repo_label = ctk.CTkLabel(
+                version_container,
+                text="Repository:",
+                font=("Arial", 16, "bold")
+            )
+            repo_label.pack(anchor="w", pady=(0, 8))
+            
+            repo_link = ctk.CTkButton(
+                version_container,
+                text=self.version_manager.get_repo_url(),
+                font=("Arial", 13, "underline"),
+                fg_color="transparent",
+                text_color=("black", "white"),
+                hover_color=("gray80", "gray30"),
+                command=lambda: webbrowser.open(self.version_manager.get_repo_url()),
+                anchor="w"
+            )
+            repo_link.pack(anchor="w", pady=(0, 10))
+            
+            # ============================================================
+            # BOTTOM LEFT: Update Status (Row 1, Column 0)
+            # ============================================================
+            update_container = ctk.CTkFrame(grid_container, fg_color="transparent")
+            update_container.grid(row=1, column=0, sticky="nsew", padx=(0, 10), pady=(10, 0))
+            
+            # Status indicator
+            status_header = ctk.CTkFrame(update_container, fg_color="transparent")
+            status_header.pack(fill="x", pady=(0, 15))
+            
+            status_label = ctk.CTkLabel(
+                status_header,
+                text="Update Status:",
+                font=("Arial", 16, "bold")
+            )
+            status_label.pack(side="left", padx=(0, 15))
+            
+            self.status_indicator = ctk.CTkLabel(
+                status_header,
+                text="⟳ Checking...",
+                font=("Arial", 16),
+                text_color=("gray50", "gray50")
+            )
+            self.status_indicator.pack(side="left")
+            
+            # Latest version info
+            self.latest_version_label = ctk.CTkLabel(
+                update_container,
+                text="",
+                font=("Arial", 13),
+                text_color=("gray50", "gray70")
+            )
+            self.latest_version_label.pack(anchor="w", pady=(0, 15))
+            
+            # Update button
+            self.update_btn = ctk.CTkButton(
+                update_container,
+                text="Check for Updates",
+                font=("Arial", 16, "bold"),
+                height=45,
+                command=self._check_updates,
+                state="disabled"
+            )
+            self.update_btn.pack(fill="x", pady=(0, 15))
+            
+            # Progress section (hidden initially)
+            self.progress_container = ctk.CTkFrame(update_container, fg_color="transparent")
+            
+            self.progress_label = ctk.CTkLabel(
+                self.progress_container,
+                text="",
+                font=("Arial", 13)
+            )
+            self.progress_label.pack(anchor="w", pady=(0, 8))
+            
+            self.progress_bar = ctk.CTkProgressBar(self.progress_container, height=8)
+            self.progress_bar.pack(fill="x")
+            self.progress_bar.set(0)
+            
+            # ============================================================
+            # RIGHT SIDE: Release Notes (Row 0-1, Column 1) - Spans both rows
+            # ============================================================
+            notes_container = ctk.CTkFrame(grid_container, fg_color="transparent")
+            notes_container.grid(row=0, column=1, rowspan=2, sticky="nsew", padx=(10, 0))
+            
+            # Header
+            notes_label = ctk.CTkLabel(
+                notes_container,
+                text="Release Notes",
+                font=("Arial", 16, "bold")
+            )
+            notes_label.pack(anchor="w", pady=(0, 10))
+            
+            # Scrollable text area for release notes
+            self.notes_text = ctk.CTkTextbox(
+                notes_container,
+                font=("Arial", 12),
+                wrap="word",
+                fg_color="transparent"
+            )
+            self.notes_text.pack(fill="both", expand=True)
+            self.notes_text.insert("1.0", "Loading release information...")
+            self.notes_text.configure(state="disabled")
+            
+            # Start checking for updates
+            self._check_updates()
+            
         except Exception as e:
-            print(f"⚠️  Failed to open settings: {e}")
+            print(f"⚠️  Failed to load settings page: {e}")
             import traceback
             traceback.print_exc()
+    
+    def _check_updates(self):
+        """Check for available updates"""
+        if hasattr(self, 'status_indicator'):
+            self.status_indicator.configure(text="⟳ Checking...", text_color=("gray50", "gray50"))
+        if hasattr(self, 'update_btn'):
+            self.update_btn.configure(state="disabled", text="Checking...")
+        
+        def callback(success, version, error):
+            # Update UI on main thread
+            self.after(0, lambda: self._update_check_complete(success, version, error))
+        
+        self.version_manager.check_for_updates(callback)
+    
+    def _update_check_complete(self, success, version, error):
+        """Handle update check completion"""
+        if not hasattr(self, 'status_indicator'):
+            return  # Settings page was closed
+            
+        if success:
+            if self.version_manager.update_available:
+                # Update available
+                self.status_indicator.configure(
+                    text="⚠️ Outdated",
+                    text_color=("orange", "orange")
+                )
+                self.latest_version_label.configure(
+                    text=f"Latest version: v{version}"
+                )
+                self.update_btn.configure(
+                    state="normal",
+                    text="Install Update",
+                    command=self._install_update
+                )
+            else:
+                # Up to date
+                self.status_indicator.configure(
+                    text="✓ Synced",
+                    text_color=("green", "lightgreen")
+                )
+                self.latest_version_label.configure(
+                    text="You're running the latest version"
+                )
+                self.update_btn.configure(
+                    state="normal",
+                    text="Check for Updates"
+                )
+            
+            # Load release notes
+            self._load_release_notes()
+        else:
+            # Error
+            self.status_indicator.configure(
+                text="✗ Error",
+                text_color=("red", "lightcoral")
+            )
+            self.latest_version_label.configure(
+                text=error or "Failed to check for updates"
+            )
+            self.update_btn.configure(
+                state="normal",
+                text="Retry",
+                command=self._check_updates
+            )
+    
+    def _load_release_notes(self):
+        """Load release notes from GitHub"""
+        if not hasattr(self, 'notes_text'):
+            return  # Settings page was closed
+            
+        try:
+            release_info = self.version_manager.latest_release_info
+            if release_info:
+                notes = release_info.get("body", "No release notes available.")
+                release_name = release_info.get("name", "")
+                tag_name = release_info.get("tag_name", "")
+                
+                self.notes_text.configure(state="normal")
+                self.notes_text.delete("1.0", "end")
+                
+                if release_name:
+                    self.notes_text.insert("end", f"{release_name}\n\n")
+                elif tag_name:
+                    self.notes_text.insert("end", f"{tag_name}\n\n")
+                
+                self.notes_text.insert("end", notes)
+                self.notes_text.configure(state="disabled")
+            else:
+                self.notes_text.configure(state="normal")
+                self.notes_text.delete("1.0", "end")
+                self.notes_text.insert("1.0", "No release information available.")
+                self.notes_text.configure(state="disabled")
+        except Exception as e:
+            self.notes_text.configure(state="normal")
+            self.notes_text.delete("1.0", "end")
+            self.notes_text.insert("1.0", f"Failed to load release notes: {str(e)}")
+            self.notes_text.configure(state="disabled")
+    
+    def _install_update(self):
+        """Install the available update"""
+        from tkinter import messagebox
+        
+        # Confirm with user
+        response = messagebox.askyesno(
+            "Install Update",
+            f"Install update to v{self.version_manager.latest_version}?\n\n"
+            "Your profiles and settings will be preserved.\n"
+            "The application will need to restart after the update.",
+            parent=self
+        )
+        
+        if not response:
+            return
+        
+        # Show progress
+        if hasattr(self, 'progress_container'):
+            self.progress_container.pack(fill="x", pady=(10, 0))
+        if hasattr(self, 'update_btn'):
+            self.update_btn.configure(state="disabled")
+        
+        def progress_callback(stage, message, percent):
+            self.after(0, lambda: self._update_progress(message, percent))
+        
+        def completion_callback(success, message):
+            self.after(0, lambda: self._update_complete(success, message))
+        
+        self.version_manager.download_and_install_update(
+            progress_callback,
+            completion_callback
+        )
+    
+    def _update_progress(self, message, percent):
+        """Update progress display"""
+        if hasattr(self, 'progress_label'):
+            self.progress_label.configure(text=message)
+        if hasattr(self, 'progress_bar'):
+            self.progress_bar.set(percent / 100.0)
+    
+    def _update_complete(self, success, message):
+        """Handle update completion"""
+        from tkinter import messagebox
+        
+        if success:
+            messagebox.showinfo(
+                "Update Complete",
+                message,
+                parent=self
+            )
+            
+            # Prompt to restart
+            restart = messagebox.askyesno(
+                "Restart Required",
+                "Would you like to restart SyncStream now?",
+                parent=self
+            )
+            if restart:
+                self.quit()
+        else:
+            messagebox.showerror(
+                "Update Failed",
+                message,
+                parent=self
+            )
+            if hasattr(self, 'update_btn'):
+                self.update_btn.configure(state="normal")
+            if hasattr(self, 'progress_container'):
+                self.progress_container.pack_forget()
 
     def _load_statistics_page(self):
         """Load and display statistics in the main content area"""

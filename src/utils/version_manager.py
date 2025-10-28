@@ -65,7 +65,7 @@ class VersionManager:
             try:
                 self.checking = True
                 
-                # Get latest release from GitHub
+                # Try to get latest release from GitHub
                 response = requests.get(
                     f"{self.GITHUB_API_URL}/releases/latest",
                     timeout=10
@@ -77,6 +77,45 @@ class VersionManager:
                     
                     self.latest_release_info = release_data
                     self.latest_version = latest_version
+                elif response.status_code == 404:
+                    # No releases yet, check commits instead
+                    commits_response = requests.get(
+                        f"{self.GITHUB_API_URL}/commits/main",
+                        timeout=10
+                    )
+                    
+                    if commits_response.status_code == 200:
+                        commit_data = commits_response.json()
+                        # Use current version since we can't determine from commits
+                        latest_version = self.CURRENT_VERSION
+                        
+                        # Create a pseudo-release info for display
+                        self.latest_release_info = {
+                            "tag_name": f"v{self.CURRENT_VERSION}",
+                            "name": f"Version {self.CURRENT_VERSION}",
+                            "body": "Latest development version from main branch.\n\n" +
+                                   f"Latest commit: {commit_data.get('sha', '')[:7]}\n" +
+                                   f"Date: {commit_data.get('commit', {}).get('author', {}).get('date', 'Unknown')}\n" +
+                                   f"Message: {commit_data.get('commit', {}).get('message', 'No message')}"
+                        }
+                        self.latest_version = latest_version
+                        self.update_available = False  # Can't determine without releases
+                        
+                        if callback:
+                            callback(True, latest_version, None)
+                        return False, latest_version
+                    else:
+                        error_msg = f"Repository not accessible: HTTP {commits_response.status_code}"
+                        if callback:
+                            callback(False, None, error_msg)
+                        return False, None
+                else:
+                    error_msg = f"Failed to check for updates: HTTP {response.status_code}"
+                    if callback:
+                        callback(False, None, error_msg)
+                    return False, None
+                
+                if response.status_code == 200:
                     
                     # Compare versions
                     self.update_available = self._compare_versions(
