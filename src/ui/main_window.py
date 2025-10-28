@@ -512,6 +512,9 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         for i in range(4):
             self.gallery_frame.grid_columnconfigure(i, weight=1)
 
+        # Bind mousewheel for row-based scrolling
+        self._bind_gallery_scroll()
+
         # Bottom bar - single rounded clean bar for gallery controls
         frame_colors = self.theme_manager.get_frame_colors()
         bottom_bar = ctk.CTkFrame(main_frame, fg_color=frame_colors.get(
@@ -705,6 +708,50 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
 
         # Load file gallery
         self._load_file_gallery()
+
+    def _bind_gallery_scroll(self):
+        """Bind mousewheel events for row-based scrolling in gallery"""
+        def on_mousewheel(event):
+            if not self.gallery_visible:
+                return
+
+            # Calculate row height based on current mode
+            if self.is_compact_mode:
+                row_height = 259 + 16  # card_height + pady (8*2)
+            else:
+                row_height = 160 + 16  # card_height + pady (8*2)
+
+            # Get the canvas
+            canvas = self.gallery_frame._parent_canvas
+
+            # Get current scroll position
+            current_pos = canvas.yview()[0]  # Get top position (0.0 to 1.0)
+
+            # Get total scrollable height
+            bbox = canvas.bbox("all")
+            if bbox:
+                total_height = bbox[3] - bbox[1]
+                visible_height = canvas.winfo_height()
+
+                # Calculate current pixel position
+                current_pixels = current_pos * total_height
+
+                # Calculate target position (move by one row)
+                if event.delta > 0:  # Scroll up
+                    target_pixels = max(0, current_pixels - row_height)
+                else:  # Scroll down
+                    max_scroll = total_height - visible_height
+                    target_pixels = min(
+                        max_scroll, current_pixels + row_height)
+
+                # Convert back to fraction
+                target_fraction = target_pixels / total_height if total_height > 0 else 0
+
+                # Set the new scroll position
+                canvas.yview_moveto(target_fraction)
+
+        # Bind to the gallery frame and its internal canvas
+        self.gallery_frame.bind_all("<MouseWheel>", on_mousewheel)
 
     def _setup_drag_drop(self):
         """Setup drag and drop functionality"""
