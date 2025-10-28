@@ -156,17 +156,17 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         self.network_manager.transfer_protocol.register_callback(
             'on_transfer_error', self._on_transfer_error)
 
+        # Track compact mode state (must be before _build_ui)
+        self.is_compact_mode = False
+        self.compact_threshold_width = 400  # Switch to compact mode below this width
+        self.manual_size_override = False  # Track if user manually toggled size
+
         # Build UI
         self._build_ui()
 
         # Setup drag and drop if available
         if DRAG_DROP_AVAILABLE:
             self._setup_drag_drop()
-
-        # Track compact mode state
-        self.is_compact_mode = False
-        self.compact_threshold_width = 400  # Switch to compact mode below this width
-        self.manual_size_override = False  # Track if user manually toggled size
 
         # Bind window resize event to check for compact mode
         self.bind("<Configure>", self._on_window_resize)
@@ -500,9 +500,11 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         # File gallery (hidden by default)
         self.gallery_visible = False
         self.current_filter = "All"  # All, Images, Documents, Videos, Archives
+        gallery_bg = self.theme_manager.current_theme.bg_primary
         self.gallery_frame = ctk.CTkScrollableFrame(
             self.content_frame,
-            label_text=""
+            label_text="",
+            fg_color=gallery_bg
         )
         # Don't grid it yet - will be shown on toggle
 
@@ -553,10 +555,11 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         self.search_var.trace("w", lambda *args: self._filter_gallery())
         self.search_entry = ctk.CTkEntry(
             inner_bottom,
-            placeholder_text="Search files...",
+            placeholder_text="Search here...",
             width=200,
             textvariable=self.search_var,
-            font=("Arial", 11)
+            font=("Arial", 11),
+            fg_color="transparent"
         )
         # Don't grid it yet - will be shown when gallery is visible
 
@@ -794,6 +797,18 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 self._switch_to_compact_mode()
             elif not should_be_compact and self.is_compact_mode:
                 self._switch_to_normal_mode()
+
+            # Manage search/filter visibility based on window width even when not switching modes
+            if self.gallery_visible and hasattr(self, 'search_entry') and hasattr(self, 'filter_btn'):
+                if window_width < 600:
+                    # Hide search and filter if window is too narrow
+                    self.search_entry.grid_remove()
+                    self.filter_btn.grid_remove()
+                elif not self.is_compact_mode:
+                    # Show search and filter if window is wide enough and not in compact mode
+                    self.search_entry.grid(row=0, column=1, padx=8, sticky="w")
+                    self.filter_btn.grid(
+                        row=0, column=2, padx=(0, 8), sticky="w")
         except Exception as e:
             print(f"⚠️  Window resize handler error: {e}")
 
@@ -814,8 +829,8 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             else:
                 # Switch to compact mode and resize window
                 self._switch_to_compact_mode()
-                # Resize window to compact size (half the height)
-                self.geometry("380x300")
+                # Resize window to compact size (295px height)
+                self.geometry("380x295")
                 # Update icon to up arrow (for going normal)
                 self._update_size_button_icon("up.png")
                 print("📱 Manual switch to compact mode")
@@ -851,10 +866,10 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             if hasattr(self, 'top_frame') and self.top_frame:
                 self.top_frame.grid_remove()
 
-            # Hide gallery if it's visible
+            # Keep gallery visible if it's already showing, but hide search and filter
             if hasattr(self, 'gallery_visible') and self.gallery_visible:
-                if hasattr(self, 'gallery_frame') and self.gallery_frame:
-                    self.gallery_frame.grid_remove()
+                # Reload gallery with smaller thumbnails for compact mode
+                self._load_file_gallery()
 
             # Hide search and filter buttons
             if hasattr(self, 'search_entry') and self.search_entry:
@@ -864,7 +879,10 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
 
             # Update gallery button text
             if hasattr(self, 'gallery_btn'):
-                self.gallery_btn.configure(text="Gallery")
+                if hasattr(self, 'gallery_visible') and self.gallery_visible:
+                    self.gallery_btn.configure(text="Hide Gallery")
+                else:
+                    self.gallery_btn.configure(text="Gallery")
 
             # Make drag-drop label more prominent in compact mode
             if hasattr(self, 'drop_label'):
@@ -885,17 +903,20 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             if hasattr(self, 'top_frame') and self.top_frame:
                 self.top_frame.grid()
 
-            # Show gallery if it was visible before
+            # Reload gallery with normal size thumbnails if it was visible
             if hasattr(self, 'gallery_visible') and self.gallery_visible:
+                self._load_file_gallery()
                 if hasattr(self, 'gallery_frame') and self.gallery_frame:
                     self.gallery_frame.grid()
-                    # Show search and filter
-                    if hasattr(self, 'search_entry'):
-                        self.search_entry.grid(
-                            row=0, column=1, padx=8, sticky="w")
-                    if hasattr(self, 'filter_btn'):
-                        self.filter_btn.grid(
-                            row=0, column=2, padx=(0, 8), sticky="w")
+                    # Show search and filter in normal mode if window is wide enough
+                    window_width = self.winfo_width()
+                    if window_width > 600:
+                        if hasattr(self, 'search_entry'):
+                            self.search_entry.grid(
+                                row=0, column=1, padx=8, sticky="w")
+                        if hasattr(self, 'filter_btn'):
+                            self.filter_btn.grid(
+                                row=0, column=2, padx=(0, 8), sticky="w")
 
             # Update gallery button text
             if hasattr(self, 'gallery_btn'):
@@ -1156,9 +1177,14 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             self.gallery_btn.configure(text="Hide Gallery")
             self.gallery_visible = True
 
-            # Show search and filter
-            self.search_entry.grid(row=0, column=1, padx=5, pady=5, sticky="w")
-            self.filter_btn.grid(row=0, column=2, padx=5, pady=5)
+            # Reload gallery to ensure correct layout for current mode
+            self._load_file_gallery()
+
+            # Show search and filter only if not in compact mode or if window is wide enough
+            window_width = self.winfo_width()
+            if not self.is_compact_mode and window_width > 600:
+                self.search_entry.grid(row=0, column=1, padx=8, sticky="w")
+                self.filter_btn.grid(row=0, column=2, padx=(0, 8), sticky="w")
 
     def _cycle_filter(self):
         """Cycle through file filters"""
@@ -1206,6 +1232,12 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
 
     def _load_file_gallery(self, search_filter=""):
         """Load files into gallery"""
+        # Debug: Log current mode and expected layout
+        mode_str = "COMPACT" if self.is_compact_mode else "NORMAL"
+        columns = 2 if self.is_compact_mode else 5
+        print(
+            f"🔄 Loading gallery in {mode_str} mode with {columns} columns per row")
+
         # Clear existing items
         for widget in self.gallery_frame.winfo_children():
             widget.destroy()
@@ -1226,6 +1258,8 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             files = [f for f in files if search_filter in Path(f).name.lower()]
 
         if not files:
+            # Use appropriate columnspan based on mode
+            max_columns = 2 if self.is_compact_mode else 5
             no_files_label = ctk.CTkLabel(
                 self.gallery_frame,
                 text="No files found" if (
@@ -1233,13 +1267,46 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 font=("Arial", 14),
                 text_color="gray"
             )
-            no_files_label.grid(row=0, column=0, columnspan=4, pady=20)
+            no_files_label.grid(
+                row=0, column=0, columnspan=max_columns, pady=20)
             return
 
         # Display files in grid
         for idx, file_path in enumerate(files):
-            row = idx // 4
-            col = idx % 4
+            # Adjust grid layout and sizes based on compact mode
+            if self.is_compact_mode:
+                columns_per_row = 2
+                row = idx // columns_per_row
+                col = idx % columns_per_row
+                card_width = 230  # 20% bigger than 192
+                card_height = 259  # 20% bigger than 216
+                icon_width = 72  # 20% bigger thumbnails
+                icon_height = 58  # 20% bigger thumbnails (rounded from 57.6)
+                icon_font_size = 46  # 20% bigger
+                name_font_size = 12
+                button_width = 101  # 20% bigger (rounded from 100.8)
+                button_height = 36
+                button_font_size = 14
+                delete_btn_size = 24
+                delete_btn_x_offset = -2
+                delete_btn_y_offset = 14
+            else:
+                columns_per_row = 5
+                row = idx // columns_per_row
+                col = idx % columns_per_row
+                card_width = 160
+                card_height = 160
+                icon_width = 120
+                icon_height = 90
+                icon_font_size = 40
+                name_font_size = 10
+                button_width = self.btn_width
+                button_height = 34
+                button_font_size = 14
+                delete_btn_size = 28
+                delete_btn_width = 30  # 50% smaller (60 -> 30)
+                delete_btn_x_offset = -2  # Same as compact mode
+                delete_btn_y_offset = 18
 
             file_name = Path(file_path).name
 
@@ -1253,17 +1320,18 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             file_frame.grid(row=row, column=col, padx=8, pady=8, sticky="nsew")
             # Fix size so all items have equal dimensions
             try:
-                file_frame.configure(width=160, height=160)
+                file_frame.configure(width=card_width, height=card_height)
                 file_frame.grid_propagate(False)
             except Exception:
                 pass
 
-            # Generate thumbnail or use icon
-            thumbnail = self._get_file_thumbnail(file_path)
+            # Generate thumbnail or use icon (pass correct size based on mode)
+            thumbnail = self._get_file_thumbnail(
+                file_path, size=(icon_width, icon_height))
 
             # Icon container - fixed size so thumbnails and emojis align
             icon_container = ctk.CTkFrame(
-                file_frame, fg_color="transparent", width=120, height=90)
+                file_frame, fg_color="transparent", width=icon_width, height=icon_height)
             icon_container.pack(pady=(10, 5))
             try:
                 icon_container.pack_propagate(False)
@@ -1285,7 +1353,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 file_icon = ctk.CTkLabel(
                     icon_container,
                     text=icon_emoji,
-                    font=("Arial", 40),
+                    font=("Arial", icon_font_size),
                     fg_color="transparent"
                 )
 
@@ -1296,14 +1364,14 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 file_frame,
                 text=file_name if len(
                     file_name) < 20 else file_name[:17] + "...",
-                font=("Arial", 10, "bold")
+                font=("Arial", name_font_size, "bold")
             )
             name_label.pack(pady=2)
 
             # Progress bar (initially hidden)
             progress_bar = ctk.CTkProgressBar(
                 file_frame,
-                width=120,
+                width=icon_width,
                 height=10,
                 mode="determinate"
             )
@@ -1327,10 +1395,10 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             open_btn = ctk.CTkButton(
                 btn_container,
                 text="Open",
-                width=self.btn_width,
-                height=34,
+                width=button_width,
+                height=button_height,
                 command=lambda fp=file_path: self._open_file(fp),
-                font=self.btn_font,
+                font=("Arial", button_font_size, "bold"),
                 fg_color="#3e8a50",  # Lighter green
                 hover_color="#13491F"  # Medium green
             )
@@ -1341,31 +1409,14 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 send_btn = ctk.CTkButton(
                     btn_container,
                     text="📤",
-                    width=self.btn_width,
-                    height=34,
+                    width=button_width,
+                    height=button_height,
                     command=lambda fp=file_path: self._send_file(fp),
                     font=self.btn_font,
                     fg_color="#28a745",  # Lighter green
                     hover_color="#218838"  # Medium green
                 )
                 send_btn.pack(side="left", padx=3)
-
-            # Transparent top-right remove "X" button (no background)
-            remove_btn = ctk.CTkButton(
-                file_frame,
-                text="✕",
-                width=28,
-                height=28,
-                command=lambda fp=file_path: self._remove_file(fp),
-                font=("Arial", 12, "bold"),
-                fg_color="transparent",
-                hover_color=("#f0f0f0", "#2a2a2a"),
-                text_color=("#b00020", "#ff6b6b"),
-                corner_radius=14,
-                border_width=0
-            )
-            # place in top-right corner of the item
-            remove_btn.place(relx=1.0, x=-8, y=8, anchor='ne')
 
             # Right-click context menu
             file_frame.bind("<Button-3>", lambda e,
@@ -1385,21 +1436,35 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 "btn_container": btn_container,
             }
 
-    def _get_file_thumbnail(self, file_path):
-        """Generate thumbnail for image files"""
+    def _get_file_thumbnail(self, file_path, size=(80, 80)):
+        """Generate thumbnail for image files with aspect ratio preserved"""
         try:
             path = Path(file_path)
             if path.suffix.lower() in ['.png', '.jpg', '.jpeg', '.gif', '.bmp', '.webp', '.ico']:
-                # Use file_manager to generate thumbnail
+                # Use file_manager to generate thumbnail with requested size
                 thumb_path = self.file_manager.generate_thumbnail(
-                    str(file_path), size=(80, 80))
+                    str(file_path), size=size)
                 if thumb_path and Path(thumb_path).exists():
                     # Load thumbnail as CTkImage
                     pil_image = Image.open(thumb_path)
+
+                    # Calculate aspect ratio and adjust size to fit within bounds
+                    img_width, img_height = pil_image.size
+                    max_width, max_height = size
+
+                    # Calculate scaling factor to fit within bounds while preserving aspect ratio
+                    width_ratio = max_width / img_width
+                    height_ratio = max_height / img_height
+                    scale_factor = min(width_ratio, height_ratio)
+
+                    # Calculate final size maintaining aspect ratio
+                    final_width = int(img_width * scale_factor)
+                    final_height = int(img_height * scale_factor)
+
                     ctk_image = ctk.CTkImage(
                         light_image=pil_image,
                         dark_image=pil_image,
-                        size=(80, 80)
+                        size=(final_width, final_height)
                     )
                     return ctk_image
         except Exception as e:
@@ -1884,6 +1949,10 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 self.main_frame.configure(fg_color=new_bg)
             if hasattr(self, 'content_frame'):
                 self.content_frame.configure(fg_color=new_bg)
+
+            # Update gallery frame background
+            if hasattr(self, 'gallery_frame'):
+                self.gallery_frame.configure(fg_color=new_bg)
 
             # Update container (root container frame)
             for widget in self.winfo_children():

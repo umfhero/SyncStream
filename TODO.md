@@ -99,6 +99,7 @@ Building a modern, clean P2P file sharing application with focus on reliability 
 - [x] Compact drag-drop label styling
 - [x] Manual size toggle button (⇄) to switch between modes
 - [x] Auto-resize window when toggling modes
+- [x] Smart gallery controls - hide search/filter when window < 600px
 
 #### Drag & Drop ✅
 
