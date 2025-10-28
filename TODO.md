@@ -13,165 +13,169 @@ Building a modern, clean P2P file sharing application with focus on reliability 
 - [x] Create project structure
 - [x] Setup .gitignore
 - [x] Create profiles.json template
-- [ ] Create requirements.txt
-- [ ] Write initial README.md
-- [ ] Create TODO.md (this file)
+- [x] Create requirements.txt
+- [x] Write initial README.md
+- [x] Create TODO.md (this file)
 
-### Phase 2: Core Modules 🔄
+### Phase 2: Core Modules ✅
 
-#### Configuration Management
+#### Configuration Management ✅
 
-- [ ] `config_manager.py` - Load/save profiles, settings, preferences
-- [ ] Profile validation and error handling
-- [ ] Last connection memory
-- [ ] Settings persistence (theme, download location, compression)
+- [x] `config_manager.py` - Load/save profiles, settings, preferences
+- [x] Profile validation and error handling
+- [x] Last connection memory
+- [x] Settings persistence (theme, download location, compression)
 
-#### Network Layer
+#### Network Layer ✅
 
-- [ ] `network_manager.py` - TCP socket handling
-- [ ] Connection state machine (disconnected → connecting → connected)
-- [ ] Auto-reconnect logic with 2-3 min timeout
-- [ ] Manual retry functionality
-- [ ] Connection status callbacks
-- [ ] Tailscale connectivity detection
+- [x] `network_manager.py` - TCP socket handling
+- [x] Connection state machine (disconnected → connecting → connected)
+- [x] Auto-reconnect logic with 2-3 min timeout
+- [x] Manual retry functionality
+- [x] Connection status callbacks
+- [x] Tailscale connectivity detection
 
-#### File Transfer Protocol
+#### File Transfer Protocol ✅
 
-- [ ] `transfer_protocol.py` - File transfer protocol design
-- [ ] Chunked file transfer with progress tracking
-- [ ] Multiple simultaneous transfer support
-- [ ] Transfer queue management
-- [ ] Retry logic (3 attempts on failure)
-- [ ] Resume capability for interrupted transfers
+- [x] `transfer_protocol.py` - File transfer protocol design
+- [x] Chunked file transfer with progress tracking
+- [x] Multiple simultaneous transfer support
+- [x] Transfer queue management
+- [x] Retry logic (3 attempts on failure)
+- [x] Resume capability for interrupted transfers
 
-#### File Management
+#### File Management ✅
 
-- [ ] `file_manager.py` - File operations
-- [ ] Thumbnail generation for images
-- [ ] File metadata tracking (sender, date, size, type)
-- [ ] Transfer history persistence
-- [ ] Auto-zip for folders
-- [ ] Optional compression toggle
-- [ ] AppData folder management
+- [x] `file_manager.py` - File operations
+- [x] Thumbnail generation for images
+- [x] File metadata tracking (sender, date, size, type)
+- [x] Transfer history persistence
+- [x] Auto-zip for folders
+- [x] Optional compression toggle
+- [x] AppData folder management
 
-### Phase 3: UI Components 🎨
+### Phase 3: UI Components ✅
 
-#### Main Window
+#### Main Window ✅
 
-- [ ] `main_window.py` - Main application window
-- [ ] Title bar with connection LED (red/orange/green)
-- [ ] Profile selector dropdowns
-- [ ] Connect button
-- [ ] Try Connecting button
-- [ ] Theme toggle button
-- [ ] Window resize handling
-- [ ] Responsive layout system
+- [x] `main_window.py` - Main application window
+- [x] Title bar with connection LED (red/orange/green)
+- [x] Profile selector dropdowns with dynamic width
+- [x] Connect button
+- [x] Try Connecting button
+- [x] Theme toggle button
+- [x] Window resize handling
+- [x] Responsive layout system
+- [x] Bottom bar layout with left/right alignment
+- [x] Proper spacing between UI elements
 
-#### File Gallery
+#### File Gallery ✅
 
-- [ ] `file_gallery.py` - Grid-based file display
-- [ ] Thumbnail generation and caching
-- [ ] File card component (thumbnail, name, size, metadata)
-- [ ] Grid layout with responsive sizing
-- [ ] Context menu (Open, Delete, Re-send, Save As, Download)
-- [ ] Search bar with autocomplete
-- [ ] Filters (by user, by date, by file type)
-- [ ] Sort functionality
+- [x] Grid-based file display
+- [x] Thumbnail generation and caching
+- [x] File card component (thumbnail, name, size, metadata)
+- [x] Grid layout with responsive sizing
+- [x] Context menu (Open, Delete, Re-send, Save As, Download)
+- [x] Search bar with autocomplete
+- [x] Filters (by user, by date, by file type)
+- [x] Sort functionality
 
-#### Transfer Progress
+#### Transfer Progress ✅
 
-- [ ] `transfer_progress.py` - Transfer tracking UI
-- [ ] Progress bars for active transfers
-- [ ] Transfer speed and ETA display
-- [ ] Checklist of queued/active/completed transfers
-- [ ] Retry status indicators
-- [ ] Cancel transfer functionality
+- [x] Transfer tracking UI
+- [x] Progress bars for active transfers
+- [x] Transfer speed and ETA display
+- [x] Checklist of queued/active/completed transfers
+- [x] Retry status indicators
+- [x] Cancel transfer functionality
 
-#### Compact Mode
+#### Compact Mode ✅
 
-- [ ] `compact_view.py` - Minimal UI for small windows
-- [ ] Auto-switch at <30% screen size
-- [ ] Drag-drop zone only
-- [ ] Essential controls visible
-- [ ] Smooth transition between modes
+- [x] Auto-switch at <30% screen size or <400px width
+- [x] Hide top bar with profile selectors
+- [x] Hide gallery when in compact mode
+- [x] Minimal drag-drop zone with essential controls
+- [x] Smooth transition between modes
+- [x] Compact drag-drop label styling
+- [x] Manual size toggle button (⇄) to switch between modes
+- [x] Auto-resize window when toggling modes
 
-#### Drag & Drop
+#### Drag & Drop ✅
 
-- [ ] Integrate TkinterDnD2
-- [ ] File drop handling
-- [ ] Folder drop with auto-zip
-- [ ] Multiple file drops
-- [ ] Visual feedback during drag
-- [ ] Drop zone highlighting
+- [x] Integrate TkinterDnD2
+- [x] File drop handling
+- [x] Folder drop with auto-zip
+- [x] Multiple file drops
+- [x] Visual feedback during drag
+- [x] Drop zone highlighting
 
-### Phase 4: System Integration 🔧
+### Phase 4: System Integration ✅
 
-#### System Tray
+#### System Tray ✅
 
-- [ ] `tray_icon.py` - System tray handler
-- [ ] Tray icon with SyncStream logo
-- [ ] Tray menu (Show/Hide, Send File, Settings, Exit)
-- [ ] Minimize to tray
-- [ ] Restore from tray
-- [ ] Tray notifications for events
+- [x] System tray handler
+- [x] Tray icon with SyncStream logo
+- [x] Tray menu (Show/Hide, Send File, Settings, Exit)
+- [x] Minimize to tray
+- [x] Restore from tray
+- [x] Tray notifications for events
 
-#### Notifications
+#### Notifications ✅
 
-- [ ] `notifications.py` - System notification handler
-- [ ] Incoming file notifications
-- [ ] Transfer complete notifications
-- [ ] Error notifications with details
-- [ ] Connection status change notifications
-- [ ] Configurable notification settings
+- [x] System notification handler
+- [x] Incoming file notifications
+- [x] Transfer complete notifications
+- [x] Error notifications with details
+- [x] Connection status change notifications
+- [x] Configurable notification settings
 
-#### Statistics
+#### Statistics 🔄
 
-- [ ] `statistics.py` - Usage tracking
-- [ ] Total data transferred (overall)
-- [ ] Per-user transfer statistics
-- [ ] Transfer count tracking
-- [ ] History with timestamps
-- [ ] Statistics display UI
+- [x] Total data transferred (overall)
+- [x] Per-user transfer statistics
+- [x] Transfer count tracking
+- [x] History with timestamps
+- [ ] Statistics display UI (partial)
 - [ ] Export statistics functionality
 
-### Phase 5: Theme System 🎨
+### Phase 5: Theme System ✅
 
-- [ ] `theme_manager.py` - Theme handling
-- [ ] Light theme implementation (colors, fonts, shadows)
-- [ ] Dark theme implementation
-- [ ] Theme toggle without restart
-- [ ] Persistent theme preference
-- [ ] Dynamic component theming
-- [ ] Custom color definitions
+- [x] `theme_manager.py` - Theme handling
+- [x] Light theme implementation (colors, fonts, shadows)
+- [x] Dark theme implementation
+- [x] Theme toggle without restart
+- [x] Persistent theme preference
+- [x] Dynamic component theming
+- [x] Custom color definitions
 
-### Phase 6: Advanced Features ⚡
+### Phase 6: Advanced Features ✅
 
-#### Connection Intelligence
+#### Connection Intelligence ✅
 
-- [ ] Auto-reconnect on disconnect
-- [ ] Reconnect timeout (2-3 minutes)
-- [ ] Queue transfers when disconnected
-- [ ] Auto-send queued files on reconnect
-- [ ] Connection health monitoring
-- [ ] Tailscale status detection
+- [x] Auto-reconnect on disconnect
+- [x] Reconnect timeout (2-3 minutes)
+- [x] Queue transfers when disconnected
+- [x] Auto-send queued files on reconnect
+- [x] Connection health monitoring
+- [x] Tailscale status detection
 
-#### Error Handling
+#### Error Handling ✅
 
-- [ ] Comprehensive error detection
-- [ ] User-friendly error messages
-- [ ] Tailscale-specific error detection
-- [ ] Network failure handling
-- [ ] File access error handling
-- [ ] Retry logic with backoff
-- [ ] Error logging for debugging
+- [x] Comprehensive error detection
+- [x] User-friendly error messages
+- [x] Tailscale-specific error detection
+- [x] Network failure handling
+- [x] File access error handling
+- [x] Retry logic with backoff
+- [x] Error logging for debugging
 
-#### File Compression
+#### File Compression ✅
 
-- [ ] Optional compression toggle
-- [ ] Compress files before sending
-- [ ] Decompress on receive
-- [ ] Compression ratio display
-- [ ] Skip compression for already compressed files
+- [x] Optional compression toggle
+- [x] Compress files before sending
+- [x] Decompress on receive
+- [x] Compression ratio display
+- [x] Skip compression for already compressed files
 
 ### Phase 7: Testing & Polish 🧪
 
@@ -255,4 +259,4 @@ _None yet - starting fresh!_
 
 ---
 
-**Last Updated:** October 26, 2025
+**Last Updated:** October 28, 2025

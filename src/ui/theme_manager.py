@@ -68,7 +68,7 @@ class ThemeManager:
         info="#3498DB",             # Blue
 
         # Border and shadow
-        border="#E0E0E0",           # Light border
+        border="#F3F3F3",           # Light border
         shadow="rgba(0, 0, 0, 0.1)",  # Subtle shadow
 
         # Special
@@ -78,12 +78,12 @@ class ThemeManager:
     # Dark Theme - Deep charcoal with luminous blue accent
     DARK_THEME = ThemeColors(
         # Backgrounds
-        bg_primary="#121212",       # Deep charcoal main background
-        bg_secondary="#2B2B2B",     # Slightly lighter for cards/top bar
+        bg_primary="#262C27",       # Deep charcoal main background
+        bg_secondary="#393F38",     # Slightly lighter for cards/top bar
         bg_tertiary="#252525",      # Between primary and secondary
 
         # Text
-        text_primary="#ECEFF1",     # Light gray for primary text
+        text_primary="#FFFFFF",     # Light gray for primary text
         text_secondary="#B0BEC5",   # Medium gray for secondary text
         text_disabled="#546E7A",    # Darker gray for disabled
 
@@ -99,8 +99,8 @@ class ThemeManager:
         info="#3498DB",             # Blue
 
         # Border and shadow
-        border="#3A3A3A",           # Subtle border
-        shadow="rgba(0, 0, 0, 0.3)",  # Stronger shadow
+        border="#4C554D",           # Subtle border
+        shadow="rgba(2, 2, 2, 0.6)",  # Stronger shadow
 
         # Special
         # Light overlay for dark theme

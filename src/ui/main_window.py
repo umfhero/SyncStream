@@ -163,6 +163,14 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         if DRAG_DROP_AVAILABLE:
             self._setup_drag_drop()
 
+        # Track compact mode state
+        self.is_compact_mode = False
+        self.compact_threshold_width = 400  # Switch to compact mode below this width
+        self.manual_size_override = False  # Track if user manually toggled size
+
+        # Bind window resize event to check for compact mode
+        self.bind("<Configure>", self._on_window_resize)
+
     def _load_profiles(self):
         """Load profile information from config"""
         try:
@@ -322,8 +330,6 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
 
         # My Profile selector
         profile_names = list(self.profiles.keys())
-        my_profile_width = max(
-            [len(name) for name in profile_names]) * 10 if profile_names else 100
 
         self.my_profile_var = ctk.StringVar(
             value=profile_names[0] if profile_names else "")
@@ -331,9 +337,9 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             inner_top,
             variable=self.my_profile_var,
             values=profile_names if profile_names else ["No profiles"],
-            width=self.btn_width,
+            width=10,  # Will be updated dynamically
             font=self.btn_font,
-            dynamic_resizing=False
+            dynamic_resizing=True  # Enable dynamic resizing
         )
         self.my_profile_selector.grid(
             row=0, column=1, padx=(0, 10), sticky="w")
@@ -355,18 +361,15 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         connect_label.grid(row=0, column=3, padx=(0, 5), sticky="w")
 
         # Peer Profile selector
-        peer_profile_width = max(
-            [len(name) for name in profile_names]) * 10 if profile_names else 100
-
         self.peer_profile_var = ctk.StringVar(value=profile_names[1] if len(
             profile_names) > 1 else (profile_names[0] if profile_names else ""))
         self.peer_profile_selector = ctk.CTkOptionMenu(
             inner_top,
             variable=self.peer_profile_var,
             values=profile_names if profile_names else ["No profiles"],
-            width=self.btn_width,
+            width=10,  # Will be updated dynamically
             font=self.btn_font,
-            dynamic_resizing=False
+            dynamic_resizing=True  # Enable dynamic resizing
         )
         self.peer_profile_selector.grid(
             row=0, column=4, padx=(0, 10), sticky="w")
@@ -526,12 +529,14 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         inner_bottom.grid_columnconfigure(0, weight=0)  # Show Gallery
         inner_bottom.grid_columnconfigure(1, weight=0)  # Search (when visible)
         inner_bottom.grid_columnconfigure(2, weight=0)  # Filter (when visible)
-        # Spacer - expands to push right buttons
+        # Spacer - expands to push right buttons to the right
         inner_bottom.grid_columnconfigure(3, weight=1)
         inner_bottom.grid_columnconfigure(4, weight=0)  # Right group container
 
         # Store bottom_bar reference for later use
         self.bottom_bar = bottom_bar
+        # Allow inner_bottom to expand
+        bottom_bar.grid_columnconfigure(0, weight=1)
 
         # Gallery toggle button (left side)
         self.gallery_btn = ctk.CTkButton(
@@ -565,16 +570,16 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         )
         # Don't grid it yet - will be shown when gallery is visible
 
-        # Theme toggle button (kept on bottom bar)
-        # Create a container frame for right-aligned buttons first
+        # Create a container frame for right-aligned buttons (Connect, Status LED, Theme)
         right_buttons_frame = ctk.CTkFrame(
             inner_bottom, fg_color="transparent")
-        right_buttons_frame.grid(row=0, column=4, sticky="e")
+        right_buttons_frame.grid(row=0, column=4, sticky="e", padx=0, pady=0)
 
-        # Configure right buttons frame columns
+        # Configure right buttons frame columns - no weight so they stay together
         right_buttons_frame.grid_columnconfigure(0, weight=0)  # Connect
         right_buttons_frame.grid_columnconfigure(1, weight=0)  # Status
-        right_buttons_frame.grid_columnconfigure(2, weight=0)  # Theme
+        right_buttons_frame.grid_columnconfigure(2, weight=0)  # Size toggle
+        right_buttons_frame.grid_columnconfigure(3, weight=0)  # Theme
 
         try:
             icon_name = "sun.png" if self.theme_manager.current_theme_name == "dark" else "moon.png"
@@ -587,16 +592,16 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                     dark_image=Image.open(icon_path),
                     size=(24, 24)
                 )
-                # Keep theme toggle but match button sizing/style
+                # Keep theme toggle but match button sizing/style - smaller width
                 self.theme_btn = ctk.CTkButton(
                     right_buttons_frame,
                     text="",
                     image=icon_image,
                     command=self._toggle_theme,
-                    width=self.btn_width,
+                    width=40,  # Smaller width
                     height=40,
                     fg_color="transparent",
-                    hover_color=("gray85", "gray25")
+                    hover=False  # Disable hover effect completely
                 )
             else:
                 theme_icon = "☀️" if self.theme_manager.current_theme_name == "dark" else "🌙"
@@ -604,11 +609,11 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                     right_buttons_frame,
                     text=theme_icon,
                     command=self._toggle_theme,
-                    width=self.btn_width,
+                    width=40,  # Smaller width
                     height=40,
                     font=self.btn_font,
                     fg_color="transparent",
-                    hover_color=("gray85", "gray25")
+                    hover=False  # Disable hover effect completely
                 )
         except Exception as e:
             theme_icon = "☀️" if self.theme_manager.current_theme_name == "dark" else "🌙"
@@ -616,11 +621,11 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 right_buttons_frame,
                 text=theme_icon,
                 command=self._toggle_theme,
-                width=self.btn_width,
+                width=40,  # Smaller width
                 height=40,
                 font=self.btn_font,
                 fg_color="transparent",
-                hover_color=("gray85", "gray25")
+                hover=False  # Disable hover effect completely
             )
 
         # Connect button
@@ -631,7 +636,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             width=self.btn_width,
             font=self.btn_font
         )
-        self.connect_btn.grid(row=0, column=0, padx=(0, 4))
+        self.connect_btn.grid(row=0, column=0, padx=(0, 12))
 
         # Status LED
         self.status_led = ctk.CTkLabel(
@@ -640,10 +645,60 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             font=("Arial", 18),
             text_color="red"
         )
-        self.status_led.grid(row=0, column=1, padx=(0, 4))
+        self.status_led.grid(row=0, column=1, padx=(0, 8))
+
+        # Size toggle button (compact/normal mode toggle) with up/down icons
+        try:
+            # Start with down icon (for compact mode)
+            icon_name = "down.png"
+            icon_path = Path(__file__).parent.parent.parent / \
+                "Assets" / icon_name
+
+            if icon_path.exists():
+                size_icon_image = ctk.CTkImage(
+                    light_image=Image.open(icon_path),
+                    dark_image=Image.open(icon_path),
+                    size=(24, 24)
+                )
+                self.size_btn = ctk.CTkButton(
+                    right_buttons_frame,
+                    text="",
+                    image=size_icon_image,
+                    command=self._toggle_size_mode,
+                    width=40,
+                    height=40,
+                    fg_color="transparent",
+                    hover=False  # Disable hover effect completely
+                )
+            else:
+                # Fallback to text if icon not found
+                self.size_btn = ctk.CTkButton(
+                    right_buttons_frame,
+                    text="⇄",
+                    command=self._toggle_size_mode,
+                    width=40,
+                    height=40,
+                    font=("Arial", 20, "bold"),
+                    fg_color="transparent",
+                    hover=False  # Disable hover effect completely
+                )
+        except Exception as e:
+            print(f"⚠️  Failed to load size icon: {e}")
+            self.size_btn = ctk.CTkButton(
+                right_buttons_frame,
+                text="⇄",
+                command=self._toggle_size_mode,
+                width=40,
+                height=40,
+                font=("Arial", 20, "bold"),
+                fg_color="transparent",
+                hover=False  # Disable hover effect completely
+            )
+
+        self.size_btn.grid(row=0, column=2, padx=(0, 8))
 
         # Theme toggle (already created above)
-        self.theme_btn.grid(row=0, column=2, padx=(0, 0))
+        self.theme_btn.grid(row=0, column=3, padx=(0, 0))
 
         # Load file gallery
         self._load_file_gallery()
@@ -714,6 +769,149 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             print("📤 Drag left - colors restored")
         except Exception as e:
             print(f"⚠️  Drag leave effect failed: {e}")
+
+    def _on_window_resize(self, event):
+        """Handle window resize event to switch between normal and compact modes"""
+        # Only process resize events for the main window (not child widgets)
+        if event.widget != self:
+            return
+
+        # Don't auto-switch if user manually toggled (give them 3 seconds before re-enabling auto)
+        if self.manual_size_override:
+            return
+
+        try:
+            window_width = self.winfo_width()
+            screen_width = self.winfo_screenwidth()
+
+            # Calculate percentage of screen width
+            width_percentage = (window_width / screen_width) * 100
+
+            # Check if we need to switch modes
+            should_be_compact = window_width < self.compact_threshold_width or width_percentage < 30
+
+            if should_be_compact and not self.is_compact_mode:
+                self._switch_to_compact_mode()
+            elif not should_be_compact and self.is_compact_mode:
+                self._switch_to_normal_mode()
+        except Exception as e:
+            print(f"⚠️  Window resize handler error: {e}")
+
+    def _toggle_size_mode(self):
+        """Manually toggle between compact and normal modes"""
+        try:
+            # Set manual override to prevent auto-switching during manual toggle
+            self.manual_size_override = True
+
+            if self.is_compact_mode:
+                # Switch to normal mode and resize window
+                self._switch_to_normal_mode()
+                # Resize window to a comfortable normal size
+                self.geometry("900x700")
+                # Update icon to down arrow (for going compact)
+                self._update_size_button_icon("down.png")
+                print("🖥️  Manual switch to normal mode")
+            else:
+                # Switch to compact mode and resize window
+                self._switch_to_compact_mode()
+                # Resize window to compact size (half the height)
+                self.geometry("380x300")
+                # Update icon to up arrow (for going normal)
+                self._update_size_button_icon("up.png")
+                print("📱 Manual switch to compact mode")
+
+            # Re-enable auto-switching after 2 seconds
+            self.after(2000, lambda: setattr(
+                self, 'manual_size_override', False))
+        except Exception as e:
+            print(f"⚠️  Size toggle error: {e}")
+
+    def _update_size_button_icon(self, icon_name):
+        """Update the size button icon"""
+        try:
+            icon_path = Path(__file__).parent.parent.parent / \
+                "Assets" / icon_name
+            if icon_path.exists():
+                new_icon = ctk.CTkImage(
+                    light_image=Image.open(icon_path),
+                    dark_image=Image.open(icon_path),
+                    size=(24, 24)
+                )
+                self.size_btn.configure(image=new_icon)
+        except Exception as e:
+            print(f"⚠️  Failed to update size icon: {e}")
+
+    def _switch_to_compact_mode(self):
+        """Switch to compact mode - minimal UI"""
+        try:
+            self.is_compact_mode = True
+            print("📱 Switching to compact mode")
+
+            # Hide top bar (profile selectors)
+            if hasattr(self, 'top_frame') and self.top_frame:
+                self.top_frame.grid_remove()
+
+            # Hide gallery if it's visible
+            if hasattr(self, 'gallery_visible') and self.gallery_visible:
+                if hasattr(self, 'gallery_frame') and self.gallery_frame:
+                    self.gallery_frame.grid_remove()
+
+            # Hide search and filter buttons
+            if hasattr(self, 'search_entry') and self.search_entry:
+                self.search_entry.grid_remove()
+            if hasattr(self, 'filter_btn') and self.filter_btn:
+                self.filter_btn.grid_remove()
+
+            # Update gallery button text
+            if hasattr(self, 'gallery_btn'):
+                self.gallery_btn.configure(text="Gallery")
+
+            # Make drag-drop label more prominent in compact mode
+            if hasattr(self, 'drop_label'):
+                self.drop_label.configure(
+                    text="Drop Files\nto Share",
+                    font=("Arial", 14, "bold")
+                )
+        except Exception as e:
+            print(f"⚠️  Failed to switch to compact mode: {e}")
+
+    def _switch_to_normal_mode(self):
+        """Switch back to normal mode - full UI"""
+        try:
+            self.is_compact_mode = False
+            print("🖥️  Switching to normal mode")
+
+            # Show top bar
+            if hasattr(self, 'top_frame') and self.top_frame:
+                self.top_frame.grid()
+
+            # Show gallery if it was visible before
+            if hasattr(self, 'gallery_visible') and self.gallery_visible:
+                if hasattr(self, 'gallery_frame') and self.gallery_frame:
+                    self.gallery_frame.grid()
+                    # Show search and filter
+                    if hasattr(self, 'search_entry'):
+                        self.search_entry.grid(
+                            row=0, column=1, padx=8, sticky="w")
+                    if hasattr(self, 'filter_btn'):
+                        self.filter_btn.grid(
+                            row=0, column=2, padx=(0, 8), sticky="w")
+
+            # Update gallery button text
+            if hasattr(self, 'gallery_btn'):
+                if hasattr(self, 'gallery_visible') and self.gallery_visible:
+                    self.gallery_btn.configure(text="Hide Gallery")
+                else:
+                    self.gallery_btn.configure(text="Show Gallery")
+
+            # Restore normal drag-drop label
+            if hasattr(self, 'drop_label'):
+                self.drop_label.configure(
+                    text="Drag & Drop Files Here",
+                    font=("Arial", 16)
+                )
+        except Exception as e:
+            print(f"⚠️  Failed to switch to normal mode: {e}")
 
     def _darken_color(self, color):
         """Darken a color by 10%"""
@@ -1133,8 +1331,8 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 height=34,
                 command=lambda fp=file_path: self._open_file(fp),
                 font=self.btn_font,
-                fg_color="#28a745",  # Lighter green
-                hover_color="#218838"  # Medium green
+                fg_color="#3e8a50",  # Lighter green
+                hover_color="#13491F"  # Medium green
             )
             open_btn.pack(side="left", padx=3)
 
