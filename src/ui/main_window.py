@@ -2129,8 +2129,12 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             import traceback
             traceback.print_exc()
     
-    def _check_updates(self):
-        """Check for available updates"""
+    def _check_updates(self, force=False):
+        """Check for available updates
+        
+        Args:
+            force: If True, bypass cache and force a fresh check
+        """
         if hasattr(self, 'status_indicator'):
             self.status_indicator.configure(text="⟳ Checking...", text_color=("gray50", "gray50"))
         if hasattr(self, 'update_btn'):
@@ -2140,7 +2144,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             # Update UI on main thread
             self.after(0, lambda: self._update_check_complete(success, version, error))
         
-        self.version_manager.check_for_updates(callback)
+        self.version_manager.check_for_updates(callback, force=force)
     
     def _update_check_complete(self, success, version, error):
         """Handle update check completion"""
@@ -2190,7 +2194,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             self.update_btn.configure(
                 state="normal",
                 text="Retry",
-                command=self._check_updates
+                command=lambda: self._check_updates(force=True)
             )
     
     def _load_release_notes(self):
@@ -2862,21 +2866,17 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             else:
                 bg_color = self.theme_manager.current_theme.bg_primary
             
-            # Update statistics frame - both the frame itself and internal components
+            # Update statistics frame
             if hasattr(self, 'statistics_frame'):
                 try:
                     self.statistics_frame.configure(fg_color=bg_color)
-                    self.statistics_frame._parent_canvas.configure(bg=bg_color)
-                    self.statistics_frame._parent_frame.configure(bg=bg_color)
                 except Exception as e:
                     print(f"⚠️  Failed to update statistics frame: {e}")
             
-            # Update settings frame - both the frame itself and internal components
+            # Update settings frame
             if hasattr(self, 'settings_frame'):
                 try:
                     self.settings_frame.configure(fg_color=bg_color)
-                    self.settings_frame._parent_canvas.configure(bg=bg_color)
-                    self.settings_frame._parent_frame.configure(bg=bg_color)
                 except Exception as e:
                     print(f"⚠️  Failed to update settings frame: {e}")
         except Exception as e:

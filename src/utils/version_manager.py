@@ -13,6 +13,7 @@ import tempfile
 import zipfile
 from pathlib import Path
 from typing import Optional, Tuple, Dict
+from datetime import datetime, timedelta
 import threading
 
 
@@ -23,6 +24,10 @@ class VersionManager:
     REPO_NAME = "SyncStream"
     GITHUB_API_URL = f"https://api.github.com/repos/{REPO_OWNER}/{REPO_NAME}"
     CURRENT_VERSION = "2.0.0"
+    
+    # Cache settings
+    CACHE_FILE = ".syncstream/update_cache.json"
+    CACHE_DURATION_HOURS = 24  # Check for updates at most once per day
     
     # Files to preserve during update (user data)
     PRESERVE_FILES = [
@@ -42,7 +47,41 @@ class VersionManager:
         self.latest_version = None
         self.latest_release_info = None
         self.checking = False
+        self._ensure_cache_dir()
         
+    def _ensure_cache_dir(self):
+        """Ensure the cache directory exists"""
+        cache_dir = Path(self.CACHE_FILE).parent
+        cache_dir.mkdir(parents=True, exist_ok=True)
+    
+    def _load_cache(self) -> Optional[Dict]:
+        """Load cached update check data"""
+        try:
+            cache_path = Path(self.CACHE_FILE)
+            if cache_path.exists():
+                with open(cache_path, 'r') as f:
+                    cache_data = json.load(f)
+                    
+                # Check if cache is still valid
+                last_check = datetime.fromisoformat(cache_data.get('timestamp', ''))
+                if datetime.now() - last_check < timedelta(hours=self.CACHE_DURATION_HOURS):
+                    return cache_data
+        except Exception as e:
+            print(f"⚠️  Failed to load update cache: {e}")
+        return None
+    
+    def _save_cache(self, data: Dict):
+        """Save update check data to cache"""
+        try:
+            cache_data = {
+                'timestamp': datetime.now().isoformat(),
+                'data': data
+            }
+            with open(self.CACHE_FILE, 'w') as f:
+                json.dump(cache_data, f, indent=2)
+        except Exception as e:
+            print(f"⚠️  Failed to save update cache: {e}")
+    
     def get_current_version(self) -> str:
         """Get the current application version"""
         return self.CURRENT_VERSION
@@ -51,16 +90,31 @@ class VersionManager:
         """Get the GitHub repository URL"""
         return f"https://github.com/{self.REPO_OWNER}/{self.REPO_NAME}"
     
-    def check_for_updates(self, callback=None) -> Tuple[bool, Optional[str]]:
+    def check_for_updates(self, callback=None, force=False) -> Tuple[bool, Optional[str]]:
         """
         Check if updates are available
         
         Args:
             callback: Optional callback function(success, version, error_msg)
+            force: Force check even if cache is valid
         
         Returns:
             Tuple of (update_available, latest_version)
         """
+        # Try to use cached data if not forcing
+        if not force:
+            cached = self._load_cache()
+            if cached:
+                cache_data = cached.get('data', {})
+                self.latest_version = cache_data.get('latest_version')
+                self.latest_release_info = cache_data.get('release_info')
+                self.update_available = cache_data.get('update_available', False)
+                
+                if callback:
+                    callback(True, self.latest_version, None)
+                
+                return self.update_available, self.latest_version
+        
         def _check():
             try:
                 self.checking = True
@@ -101,6 +155,13 @@ class VersionManager:
                         self.latest_version = latest_version
                         self.update_available = False  # Can't determine without releases
                         
+                        # Cache the result
+                        self._save_cache({
+                            'latest_version': latest_version,
+                            'release_info': self.latest_release_info,
+                            'update_available': False
+                        })
+                        
                         if callback:
                             callback(True, latest_version, None)
                         return False, latest_version
@@ -121,6 +182,13 @@ class VersionManager:
                     self.update_available = self._compare_versions(
                         latest_version, self.CURRENT_VERSION
                     )
+                    
+                    # Cache the result
+                    self._save_cache({
+                        'latest_version': latest_version,
+                        'release_info': self.latest_release_info,
+                        'update_available': self.update_available
+                    })
                     
                     if callback:
                         callback(True, latest_version, None)
