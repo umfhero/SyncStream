@@ -1,0 +1,233 @@
+# SyncStream V3.0.0 - Quick Start Guide
+
+## 🚀 What's New in V3.0.0
+
+### System Tray Integration
+- **Compact Mode Access**: Left-click system tray icon to open in small window mode
+- **Always Available**: App runs in system tray even when window is closed
+- **Quick Actions**: Right-click tray icon for full menu
+
+### Windows Startup Option
+- **Auto-Start**: Option to run SyncStream when Windows starts
+- **Configure**: Enable/disable in Settings page
+- **No Admin Required**: Uses Windows Registry (current user only)
+
+### Enhanced UI
+- **Improved Compact Mode**: Properly sized for quick access (380x295)
+- **Smooth Transitions**: Better mode switching behavior
+- **Fixed Errors**: No more TypeError messages when closing
+
+---
+
+## 📥 Installation
+
+1. **Extract** the SyncStream_V3.0.0 folder to your desired location
+2. **Run** `SyncStream.exe` (no console window, clean GUI only)
+3. That's it! No installation needed.
+
+---
+
+## ⚙️ First Time Setup
+
+### Configure Your Profile
+
+1. Open the app
+2. Go to **Settings** (gear icon)
+3. Your profile should already be configured from previous versions
+
+### Add Peer Profiles (If Needed)
+
+1. Click **Profile Manager** icon
+2. Click **+ Add Profile**
+3. Enter peer's name and Tailscale IP
+4. Maximum 2 peer profiles allowed
+
+---
+
+## 🎯 How to Use
+
+### System Tray Features (NEW!)
+
+**Minimize to Tray:**
+- Click the **X** button to close
+- App minimizes to system tray (doesn't quit)
+
+**Open from Tray:**
+- **Left-click** icon → Opens in **Compact Mode** (small window)
+- **Right-click** icon → Menu with options:
+  - Open in Compact Mode
+  - Show in Normal Mode
+  - Hide
+  - Exit (fully quit)
+
+### Compact Mode vs Normal Mode
+
+**Compact Mode** (380x295 window):
+- Small, streamlined interface
+- Perfect for quick file sharing
+- Essential controls only
+- Quick drag-and-drop
+
+**Normal Mode** (full window):
+- All features available
+- Statistics, settings, profile manager
+- Gallery view with search and filters
+- Full file history
+
+**Toggle:** Click the arrow button in top bar to switch modes
+
+### Windows Startup (NEW!)
+
+**Enable Auto-Start:**
+1. Go to **Settings**
+2. Find "Startup:" section (top left)
+3. Check "Run SyncStream when Windows starts"
+4. App will start automatically with Windows (minimized to tray)
+
+**Disable:**
+- Uncheck the same box in Settings
+
+---
+
+## 💡 File Sharing Basics
+
+### Sending Files
+
+**Method 1: Drag & Drop**
+1. Connect to a peer
+2. Drag files from Windows Explorer
+3. Drop anywhere on the window
+4. Files send automatically
+
+**Method 2: Browse**
+1. Click **Browse Files** button
+2. Select files
+3. Files appear in gallery
+
+**Method 3: From Gallery**
+1. Click **Gallery** button
+2. Click any shared file
+3. Select "Send to Peer"
+
+### Receiving Files
+
+Files are automatically saved to:
+```
+%APPDATA%\SyncStream\Downloads\
+```
+
+---
+
+## 🎨 UI Features
+
+### Themes
+- Click 🌓 button to toggle light/dark mode
+- Theme persists across sessions
+
+### Gallery
+- View all shared files
+- Filter by type (All, Images, Videos, Documents, etc.)
+- Search by filename
+- Click files for options (Open, Send, Remove, Details)
+
+### Statistics
+- View transfer history
+- File format breakdown
+- Per-user statistics
+- Total data transferred
+
+---
+
+## 🔐 Security & Network
+
+### Tailscale Required
+- Install from: https://tailscale.com/download
+- Must be running for file transfers
+- Provides secure VPN connection
+
+### Check Connection
+```bash
+tailscale status
+tailscale ip
+```
+
+---
+
+## 📁 File Locations
+
+**User Data:**
+```
+%APPDATA%\SyncStream\
+├── Downloads\          # Received files
+├── Thumbnails\        # Image previews
+└── transfer_history.json
+```
+
+**Configuration:**
+```
+<install_folder>\config\
+├── profiles.json      # Your connection profiles
+└── settings.json      # App preferences
+```
+
+---
+
+## 🐛 Troubleshooting
+
+### System Tray Icon Not Showing
+1. Restart SyncStream
+2. Check if `pystray` is installed: `pip list | findstr pystray`
+3. Look in system tray overflow (hidden icons)
+
+### Can't Connect to Peer
+1. Check Tailscale is running: `tailscale status`
+2. Verify peer's IP address
+3. Ensure both devices on same Tailscale network
+
+### Files Not Sending
+1. Check connection status (LED should be green)
+2. Try reconnecting
+3. Check file permissions
+
+### Startup Not Working
+1. Check Windows Task Manager → Startup tab
+2. Verify "SyncStream" is listed
+3. May require restart to take effect
+
+---
+
+## 📊 System Requirements
+
+- **OS**: Windows 10/11
+- **Python**: Not required for .exe version
+- **Network**: Tailscale VPN
+- **Disk Space**: ~20MB for app + space for downloads
+
+---
+
+## 🆘 Support
+
+**Documentation:**
+- Check `README.md` for detailed info
+- Review release notes for changes
+
+**Issues:**
+- Report bugs on GitHub
+- Include logs and error messages
+
+---
+
+## 🎉 Tips & Tricks
+
+1. **Quick Access**: Enable startup + use tray icon for instant access
+2. **Keyboard Shortcuts**: Drag files directly from Explorer for fastest sharing
+3. **Gallery Management**: Remove old files to keep gallery clean
+4. **Theme Sync**: Theme preference saves automatically
+5. **Multiple Profiles**: Switch between profiles without reconnecting
+
+---
+
+**Version:** 3.0.0  
+**Build Date:** November 1, 2025
+
+Enjoy seamless file sharing! 🚀

@@ -1,11 +1,11 @@
 {
-  "timestamp": "2025-10-28T18:34:28.050392",
+  "timestamp": "2025-11-01T01:20:37.756577",
   "data": {
     "latest_version": "2.0.0",
     "release_info": {
       "tag_name": "v2.0.0",
       "name": "Version 2.0.0",
-      "body": "Latest development version from main branch.\n\nLatest commit: 7ef6d60\nDate: 2025-10-28T18:27:40Z\nMessage: Add unit tests for ThemeManager and VersionManager\n\nIntroduces comprehensive unit tests for ThemeManager (theme loading, switching, color management, and callback registration) and VersionManager (version checking, caching, update logic, and version comparison). Also updates TODO.md to reflect completed testing and packaging milestones, and recent accomplishments for v2.0.0."
+      "body": "Latest development version from main branch.\n\nLatest commit: a43fa64\nDate: 2025-10-28T19:45:07Z\nMessage: Add onboarding flow and profile management UI\n\nIntroduces a first-time onboarding process to guide users through creating their own profile, with a dedicated onboarding UI in main_window.py. Refactors profile storage to separate 'my_profile' and 'peer_profiles' in config_manager.py, adds profile management methods, and updates the main window to support profile creation, selection, and management. Updates assets, documentation, and build configuration to support new features and icons."
     },
     "update_available": false
   }

@@ -30,8 +30,10 @@ def check_dependencies():
         'PIL',  # Pillow
     ]
 
-    optional = [
-        'tkinterdnd2',
+    recommended = [
+        'tkinterdnd2',  # Drag & drop
+        'pystray',      # System tray icon
+        'win10toast',   # Windows notifications
     ]
 
     all_ok = True
@@ -44,12 +46,17 @@ def check_dependencies():
             print(f"   ❌ {package} - REQUIRED")
             all_ok = False
 
-    for package in optional:
+    for package in recommended:
         try:
             __import__(package)
             print(f"   ✅ {package}")
         except ImportError:
-            print(f"   ⚠️  {package} - optional (drag-and-drop disabled)")
+            feature = {
+                'tkinterdnd2': 'drag-and-drop',
+                'pystray': 'system tray icon',
+                'win10toast': 'notifications'
+            }.get(package, 'feature')
+            print(f"   ⚠️  {package} - recommended ({feature} disabled)")
 
     return all_ok
 
@@ -71,23 +78,51 @@ def check_profiles():
         with open(profiles_file, 'r') as f:
             data = json.load(f)
 
-        profiles = data.get('profiles', [])
-        if not profiles:
+        # Check for new format (my_profile + peer_profiles)
+        my_profile = data.get('my_profile')
+        peer_profiles = data.get('peer_profiles', [])
+
+        # Also support old format (profiles array) for backward compatibility
+        old_profiles = data.get('profiles', [])
+
+        if my_profile or old_profiles:
+            # Show my profile
+            if my_profile:
+                my_name = my_profile.get('name', 'Unknown')
+                my_ip = my_profile.get('ip', '')
+                print(f"   ✅ My Profile: {my_name}")
+                if '100.' in my_ip:
+                    print(f"      • IP: {my_ip}")
+                else:
+                    print(f"      ⚠️  IP: {my_ip} - Not a Tailscale IP?")
+
+            # Show peer profiles
+            if peer_profiles:
+                print(f"   ✅ Found {len(peer_profiles)} peer profile(s)")
+                for profile in peer_profiles:
+                    ip = profile.get('ip', '')
+                    name = profile.get('name', '')
+                    if '100.' in ip:
+                        print(f"      • {name}: {ip}")
+                    else:
+                        print(f"      ⚠️  {name}: {ip} - Not a Tailscale IP?")
+            elif old_profiles:
+                # Old format
+                print(f"   ✅ Found {len(old_profiles)} profile(s)")
+                for profile in old_profiles:
+                    ip = profile.get('ip', '')
+                    name = profile.get('name', '')
+                    if '100.' in ip:
+                        print(f"      • {name}: {ip}")
+                    else:
+                        print(f"      ⚠️  {name}: {ip} - Not a Tailscale IP?")
+            else:
+                print(f"   ⚠️  No peer profiles defined (you can still use SyncStream)")
+
+            return True
+        else:
             print("   ❌ No profiles defined in profiles.json")
             return False
-
-        print(f"   ✅ Found {len(profiles)} profile(s)")
-
-        # Check if IPs look like examples
-        for profile in profiles:
-            ip = profile.get('ip', '')
-            name = profile.get('name', '')
-            if '100.' in ip:
-                print(f"      • {name}: {ip}")
-            else:
-                print(f"      ⚠️  {name}: {ip} - Not a Tailscale IP?")
-
-        return True
 
     except json.JSONDecodeError:
         print("   ❌ profiles.json has invalid JSON")

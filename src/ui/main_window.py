@@ -618,9 +618,14 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         # Save shared files
         self._save_shared_files()
 
-        # If system tray is enabled and running, minimize to tray instead of closing
-        if hasattr(self, 'tray_icon') and self.tray_icon and self.tray_icon.is_running:
+        # If system tray is available, minimize to tray instead of closing
+        if hasattr(self, 'tray_icon') and self.tray_icon:
             self.withdraw()  # Hide window
+            if self.toaster:
+                self._show_notification(
+                    "SyncStream",
+                    "App minimized to system tray"
+                )
         else:
             # Shutdown network manager
             if self.network_manager:
@@ -1508,6 +1513,10 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             self.is_compact_mode = True
             print("📱 Switching to compact mode")
 
+            # Set compact window size (only if window is visible) - 380x295
+            if self.winfo_viewable():
+                self.geometry("380x295")
+
             # Hide top bar (profile selectors)
             if hasattr(self, 'top_frame') and self.top_frame:
                 self.top_frame.grid_remove()
@@ -1544,6 +1553,12 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         try:
             self.is_compact_mode = False
             print("🖥️  Switching to normal mode")
+
+            # Restore normal window size (only if window is visible)
+            if self.winfo_viewable():
+                width = self.config_manager.settings.window_width or 1200
+                height = self.config_manager.settings.window_height or 800
+                self.geometry(f"{width}x{height}")
 
             # Show top bar
             if hasattr(self, 'top_frame') and self.top_frame:
@@ -1595,20 +1610,38 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
     def _setup_system_tray(self):
         """Setup system tray icon"""
         try:
-            # Load icon image
+            # Load icon image - check multiple locations
             icon_name = "blackp2p.ico"
-            icon_path = Path(__file__).parent.parent.parent / \
-                "Assets" / icon_name
 
-            if icon_path.exists():
-                icon_image = Image.open(icon_path)
-            else:
+            # Try multiple paths
+            possible_paths = [
+                Path(__file__).parent.parent.parent / "Assets" / icon_name,
+                Path("Assets") / icon_name,
+                Path(sys._MEIPASS) / "Assets" /
+                icon_name if hasattr(sys, '_MEIPASS') else None
+            ]
+
+            icon_image = None
+            for icon_path in possible_paths:
+                if icon_path and icon_path.exists():
+                    try:
+                        icon_image = Image.open(icon_path)
+                        print(f"✅ Loaded system tray icon from: {icon_path}")
+                        break
+                    except Exception as e:
+                        print(f"⚠️ Failed to load icon from {icon_path}: {e}")
+                        continue
+
+            if not icon_image:
                 # Create a simple default icon if file not found
+                print("⚠️ Using default icon - blackp2p.ico not found")
                 icon_image = Image.new('RGB', (64, 64), color='blue')
 
-            # Create system tray icon
+            # Create system tray icon with compact mode as default action
             menu = pystray.Menu(
-                item('Show', self._show_window, default=True),
+                item('Open in Compact Mode',
+                     self._show_window_compact, default=True),
+                item('Show in Normal Mode', self._show_window),
                 item('Hide', self._hide_window),
                 pystray.Menu.SEPARATOR,
                 item('Exit', self._quit_app)
@@ -1636,8 +1669,42 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             self.tray_icon = None
 
     def _show_window(self, icon=None, item=None):
-        """Show the main window"""
-        self.after(0, lambda: self.deiconify())
+        """Show the main window in normal mode"""
+        def show():
+            # Switch to normal mode first (before showing window)
+            if self.is_compact_mode:
+                self._switch_to_normal_mode()
+
+            # Restore normal window size
+            width = self.config_manager.settings.window_width or 1200
+            height = self.config_manager.settings.window_height or 800
+            self.geometry(f"{width}x{height}")
+
+            # Show the window
+            self.deiconify()
+
+            # Ensure window is raised and focused
+            self.lift()
+            self.focus_force()
+        self.after(0, show)
+
+    def _show_window_compact(self, icon=None, item=None):
+        """Show the main window in compact mode"""
+        def show():
+            # Switch to compact mode first (before showing window)
+            if not self.is_compact_mode:
+                self._switch_to_compact_mode()
+
+            # Set compact window size (same as size button: 380x295)
+            self.geometry("380x295")
+
+            # Show the window
+            self.deiconify()
+
+            # Ensure window is raised and focused
+            self.lift()
+            self.focus_force()
+        self.after(0, show)
 
     def _hide_window(self, icon=None, item=None):
         """Hide the main window to system tray"""
@@ -2489,7 +2556,30 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                     self.version_manager.get_repo_url()),
                 anchor="w"
             )
-            repo_link.pack(anchor="w", pady=(0, 10))
+            repo_link.pack(anchor="w", pady=(0, 20))
+
+            # Startup Settings
+            startup_label = ctk.CTkLabel(
+                version_container,
+                text="Startup:",
+                font=("Arial", 16, "bold")
+            )
+            startup_label.pack(anchor="w", pady=(0, 8))
+
+            # Run on Windows startup checkbox
+            self.startup_checkbox = ctk.CTkCheckBox(
+                version_container,
+                text="Run SyncStream when Windows starts",
+                font=("Arial", 14),
+                command=self._toggle_startup_setting
+            )
+            self.startup_checkbox.pack(anchor="w", pady=(0, 10))
+
+            # Set initial state from settings
+            if self.config_manager.settings.run_on_startup:
+                self.startup_checkbox.select()
+            else:
+                self.startup_checkbox.deselect()
 
             # ============================================================
             # BOTTOM LEFT: Update Status (Row 1, Column 0)
@@ -2765,6 +2855,43 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             if hasattr(self, 'progress_container'):
                 self.progress_container.pack_forget()
 
+    def _toggle_startup_setting(self):
+        """Toggle the run on startup setting"""
+        from tkinter import messagebox
+
+        try:
+            # Get the checkbox state
+            enabled = self.startup_checkbox.get() == 1
+
+            # Update the setting
+            self.config_manager.set_run_on_startup(enabled)
+
+            # Show confirmation
+            if enabled:
+                self._show_notification(
+                    "Startup Enabled",
+                    "SyncStream will now start when Windows starts"
+                )
+            else:
+                self._show_notification(
+                    "Startup Disabled",
+                    "SyncStream will no longer start automatically"
+                )
+
+        except Exception as e:
+            # Show error and revert checkbox
+            messagebox.showerror(
+                "Error",
+                f"Failed to update startup setting: {str(e)}\n\n"
+                "Make sure you have permission to modify Windows startup programs.",
+                parent=self
+            )
+            # Revert checkbox to previous state
+            if enabled:
+                self.startup_checkbox.deselect()
+            else:
+                self.startup_checkbox.select()
+
     def _open_profile_manager(self):
         """Toggle profile manager page visibility"""
         if self.profile_manager_visible:
@@ -2817,6 +2944,16 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
             # Get theme colors
             frame_colors = self.theme_manager.get_frame_colors()
             text_color = self.theme_manager.current_theme.text_primary
+
+            # Set proper background color based on theme
+            tm_name = getattr(self.theme_manager, 'current_theme_name', None)
+            if tm_name and str(tm_name).lower().startswith('light'):
+                bg_color = '#ffffff'
+            else:
+                bg_color = self.theme_manager.current_theme.bg_primary
+
+            # Update profile manager frame background
+            self.profile_manager_frame.configure(fg_color=bg_color)
 
             # Main container with padding
             container = ctk.CTkFrame(
@@ -2916,6 +3053,13 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                 )
                 self.profile_error_label.pack(pady=(0, 10), padx=20)
 
+                # Buttons container
+                buttons_container = ctk.CTkFrame(
+                    add_frame, fg_color="transparent")
+                buttons_container.pack(pady=(0, 20), padx=20, fill="x")
+                buttons_container.grid_columnconfigure(0, weight=1)
+                buttons_container.grid_columnconfigure(1, weight=1)
+
                 # Add button with icon
                 addprofile_icon_path = Path(
                     __file__).parent.parent.parent / "Assets" / "addprofile.png"
@@ -2926,7 +3070,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                         size=(20, 20)
                     )
                     add_btn = ctk.CTkButton(
-                        add_frame,
+                        buttons_container,
                         text="  Add Profile",
                         image=addprofile_icon,
                         compound="left",
@@ -2938,7 +3082,7 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                     )
                 else:
                     add_btn = ctk.CTkButton(
-                        add_frame,
+                        buttons_container,
                         text="➕  Add Profile",
                         font=("Segoe UI", 14, "bold"),
                         height=40,
@@ -2946,7 +3090,19 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                         fg_color="#22c55e",
                         hover_color="#16a34a"
                     )
-                add_btn.pack(pady=(0, 20), padx=20, fill="x")
+                add_btn.grid(row=0, column=0, padx=(0, 5), sticky="ew")
+
+                # Import button
+                import_btn = ctk.CTkButton(
+                    buttons_container,
+                    text="📂  Import Profiles",
+                    font=("Segoe UI", 14, "bold"),
+                    height=40,
+                    command=self._import_profiles,
+                    fg_color="#3b82f6",
+                    hover_color="#2563eb"
+                )
+                import_btn.grid(row=0, column=1, padx=(5, 0), sticky="ew")
 
             # Profile list container (only show if there are profiles) - Show AFTER add section
             if profiles and len(profiles) > 0:
@@ -3117,6 +3273,108 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
         except Exception as e:
             self.profile_error_label.configure(
                 text=f"Failed to add profile: {str(e)}")
+
+    def _import_profiles(self):
+        """Import profiles from a JSON file"""
+        from tkinter import filedialog, messagebox
+        import json
+
+        # Open file dialog
+        file_path = filedialog.askopenfilename(
+            title="Select Profiles File",
+            filetypes=[
+                ("JSON files", "*.json"),
+                ("All files", "*.*")
+            ],
+            parent=self
+        )
+
+        if not file_path:
+            return
+
+        try:
+            # Read the JSON file
+            with open(file_path, 'r') as f:
+                data = json.load(f)
+
+            imported_count = 0
+            skipped_count = 0
+
+            # Handle both old format (list) and new format (dict with my_profile/peer_profiles)
+            profiles_to_import = []
+
+            if isinstance(data, list):
+                # Old format: direct list of profiles
+                profiles_to_import = data
+            elif isinstance(data, dict):
+                # New format: check for peer_profiles or profiles key
+                if "peer_profiles" in data:
+                    profiles_to_import = data["peer_profiles"]
+                elif "profiles" in data:
+                    profiles_to_import = data["profiles"]
+                else:
+                    raise ValueError("Invalid profile file format")
+
+            # Import each profile
+            for profile_data in profiles_to_import:
+                name = profile_data.get("name", "").strip()
+                address = profile_data.get("address", "").strip()
+
+                if not name or not address:
+                    skipped_count += 1
+                    continue
+
+                # Check if profile already exists
+                existing = any(
+                    p.name == name for p in self.config_manager.profiles)
+                if existing:
+                    # Ask user if they want to overwrite
+                    overwrite = messagebox.askyesno(
+                        "Profile Exists",
+                        f"Profile '{name}' already exists. Overwrite?",
+                        parent=self
+                    )
+                    if not overwrite:
+                        skipped_count += 1
+                        continue
+                    # Remove existing profile
+                    self.config_manager.profiles = [
+                        p for p in self.config_manager.profiles if p.name != name
+                    ]
+
+                # Add the profile
+                self.config_manager.add_profile(name, address)
+                imported_count += 1
+
+            # Save profiles
+            if imported_count > 0:
+                self.config_manager.save_profiles()
+
+            # Show result
+            message = f"Successfully imported {imported_count} profile(s)"
+            if skipped_count > 0:
+                message += f"\n{skipped_count} profile(s) skipped"
+
+            messagebox.showinfo("Import Complete", message, parent=self)
+
+            # Reload the page
+            self._load_profile_manager_page()
+
+            # Refresh profile dropdowns
+            self._refresh_profiles()
+
+        except json.JSONDecodeError:
+            messagebox.showerror(
+                "Import Error",
+                "Invalid JSON file format",
+                parent=self
+            )
+        except Exception as e:
+            messagebox.showerror(
+                "Import Error",
+                f"Failed to import profiles: {str(e)}",
+                parent=self
+            )
 
     def _delete_profile(self, profile_name):
         """Delete a profile"""
@@ -3765,6 +4023,13 @@ class MainWindow(ctk.CTk if not DRAG_DROP_AVAILABLE else TkinterDnD.Tk):
                     self.settings_frame.configure(fg_color=bg_color)
                 except Exception as e:
                     print(f"⚠️  Failed to update settings frame: {e}")
+
+            # Update profile manager frame
+            if hasattr(self, 'profile_manager_frame'):
+                try:
+                    self.profile_manager_frame.configure(fg_color=bg_color)
+                except Exception as e:
+                    print(f"⚠️  Failed to update profile manager frame: {e}")
 
             # Reload profile manager if visible to update colors
             if hasattr(self, 'profile_manager_visible') and self.profile_manager_visible:

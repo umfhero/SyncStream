@@ -1,0 +1,13 @@
+{
+  "theme": "dark",
+  "download_location": null,
+  "compression_enabled": false,
+  "auto_reconnect": true,
+  "reconnect_timeout": 180,
+  "notifications_enabled": true,
+  "run_on_startup": true,
+  "window_width": 801,
+  "window_height": 515,
+  "window_x": 208,
+  "window_y": 208
+}

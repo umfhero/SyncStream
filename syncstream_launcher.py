@@ -24,7 +24,7 @@ else:
     application_path = Path(__file__).parent
     sys.path.insert(0, str(application_path / 'src'))
 
-print("🚀 Starting SyncStream V2.0.0...")
+print("🚀 Starting SyncStream V3.0.0...")
 print("=" * 50)
 
 # Now import and run

@@ -1,0 +1,50 @@
+{
+  "profiles": [
+    {
+      "name": "Majid",
+      "ip": "100.93.161.73",
+      "port": 12345,
+      "description": "Majid's primary profile"
+    },
+    {
+      "name": "Majid 2.0",
+      "ip": "100.92.141.68",
+      "port": 12345,
+      "description": "Majid's secondary profile"
+    },
+    {
+      "name": "Nathan",
+      "ip": "100.122.120.65",
+      "port": 12345,
+      "description": "Nathan's profile"
+    }
+  ],
+  "last_profile": null,
+  "last_peer": null,
+  "_comment": "CONFIGURATION INSTRUCTIONS",
+  "_instructions": {
+    "setup": [
+      "1. Copy this file to 'profiles.json' in the same directory",
+      "2. Replace the example profiles with your own Tailscale information",
+      "3. DO NOT commit profiles.json to git (it's in .gitignore)",
+      "4. Share this template file with others to help them set up"
+    ],
+    "profile_fields": {
+      "name": "Display name for this profile (your identity)",
+      "ip": "Tailscale IP address (find with 'tailscale ip')",
+      "port": "Port number (default 12345, change if needed)",
+      "description": "Optional description for this profile"
+    },
+    "finding_tailscale_ip": [
+      "Windows: Open PowerShell and run 'tailscale ip'",
+      "Linux/Mac: Open Terminal and run 'tailscale ip'",
+      "Or check the Tailscale admin console at https://login.tailscale.com/admin/machines"
+    ],
+    "example_profile": {
+      "name": "MyName",
+      "ip": "100.x.x.x",
+      "port": 12345,
+      "description": "My computer"
+    }
+  }
+}

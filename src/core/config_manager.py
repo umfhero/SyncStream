@@ -33,6 +33,7 @@ class AppSettings:
     auto_reconnect: bool = True
     reconnect_timeout: int = 180  # seconds (3 minutes)
     notifications_enabled: bool = True
+    run_on_startup: bool = False  # Run SyncStream when Windows starts
     window_width: int = 1200
     window_height: int = 800
     window_x: Optional[int] = None
@@ -284,6 +285,57 @@ class ConfigManager:
         self.settings.window_x = x
         self.settings.window_y = y
         self._save_settings()
+
+    def set_run_on_startup(self, enabled: bool) -> None:
+        """Enable or disable running SyncStream on Windows startup"""
+        import winreg
+        import sys
+
+        self.settings.run_on_startup = enabled
+        self._save_settings()
+
+        try:
+            # Registry key for startup programs
+            key_path = r"Software\Microsoft\Windows\CurrentVersion\Run"
+            app_name = "SyncStream"
+
+            # Get the path to the executable or script
+            if getattr(sys, 'frozen', False):
+                # Running as compiled executable
+                app_path = sys.executable
+            else:
+                # Running as script - use START.bat if available
+                project_root = Path(__file__).parent.parent.parent
+                start_bat = project_root / "START.bat"
+                if start_bat.exists():
+                    app_path = str(start_bat)
+                else:
+                    # Fallback to python script
+                    app_path = f'"{sys.executable}" "{Path(__file__).parent.parent.parent / "syncstream_launcher.py"}"'
+
+            # Open registry key
+            key = winreg.OpenKey(winreg.HKEY_CURRENT_USER,
+                                 key_path, 0, winreg.KEY_SET_VALUE)
+
+            if enabled:
+                # Add to startup
+                winreg.SetValueEx(key, app_name, 0,
+                                  winreg.REG_SZ, str(app_path))
+                print(f"✅ Added SyncStream to Windows startup")
+            else:
+                # Remove from startup
+                try:
+                    winreg.DeleteValue(key, app_name)
+                    print(f"✅ Removed SyncStream from Windows startup")
+                except FileNotFoundError:
+                    # Already not in startup
+                    pass
+
+            winreg.CloseKey(key)
+
+        except Exception as e:
+            print(f"❌ Error updating Windows startup setting: {e}")
+            raise
 
 
 if __name__ == "__main__":

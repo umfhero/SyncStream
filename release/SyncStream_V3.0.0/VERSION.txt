@@ -1,0 +1,56 @@
+SyncStream Version 3.0.0
+Build Date: November 1, 2025
+
+========================
+NEW IN VERSION 3.0.0
+========================
+
+✨ SYSTEM TRAY INTEGRATION
+- Left-click system tray icon to open in compact mode
+- Right-click for full menu (Open, Hide, Exit)
+- App stays running when window is closed
+- Quick access from taskbar notification area
+
+⚙️ WINDOWS STARTUP OPTION
+- Auto-start with Windows checkbox in Settings
+- Starts minimized to system tray
+- No admin rights required
+- Easy enable/disable from Settings page
+
+🎨 IMPROVED COMPACT MODE
+- Proper window sizing (380x295)
+- Opens instantly from system tray
+- Matches size button behavior exactly
+- Smooth mode transitions
+
+🐛 BUG FIXES
+- Fixed TypeError when closing window
+- Fixed AttributeError with system tray
+- Improved window geometry handling
+- Better error handling for mode switching
+
+========================
+PREVIOUS VERSIONS
+========================
+
+VERSION 2.0.0:
+- Modern dual-theme UI (light/dark)
+- Improved file gallery with thumbnails
+- Enhanced statistics page
+- Profile manager for connections
+- Auto-update system
+- Drag & drop support
+
+VERSION 1.0.0:
+- Initial release
+- Peer-to-peer file transfers
+- Tailscale VPN integration
+- Real-time progress tracking
+
+========================
+
+For detailed information, see:
+- QUICK_START.txt
+- README.md
+
+Repository: https://github.com/umfhero/SyncStream

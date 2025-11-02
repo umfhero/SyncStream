@@ -10,7 +10,7 @@ import subprocess
 from pathlib import Path
 
 # Version info
-VERSION = "2.0.0"
+VERSION = "3.0.0"
 APP_NAME = "SyncStream"
 
 
@@ -97,8 +97,7 @@ def build_executable():
         'pyinstaller',
         '--name', APP_NAME,
         '--onefile',  # Single executable file
-        # Show console for debugging (change to --windowed for release)
-        '--console',
+        '--windowed',  # No console window (GUI only)
         '--icon', 'Assets/blackp2p.ico',
         '--add-data', 'Assets;Assets',
         '--add-data', 'config;config',

@@ -5,22 +5,9 @@
   "auto_reconnect": true,
   "reconnect_timeout": 180,
   "notifications_enabled": true,
+  "run_on_startup": true,
   "window_width": 801,
   "window_height": 515,
   "window_x": 208,
-  "window_y": 208,
-  "profiles": {
-    "Majid": {
-      "ip": "100.93.161.73",
-      "port": 5000
-    },
-    "Majid 2.0": {
-      "ip": "100.92.141.68",
-      "port": 5000
-    },
-    "Nathan": {
-      "ip": "100.122.120.65",
-      "port": 5000
-    }
-  }
+  "window_y": 208
 }
